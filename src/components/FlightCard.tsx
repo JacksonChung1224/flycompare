@@ -20,21 +20,33 @@ import type { FlightResult } from '@/lib/types';
 // Helper functions
 // ============================================================
 
-/** 格式化時間 HH:MM */
+/**
+ * 格式化時間 HH:MM
+ * Duffel API 回傳的 departing_at / arriving_at 是「當地機場時間」，
+ * 格式為 ISO 8601 不含時區（例如 "2026-05-30T21:00:00"）。
+ * 直接從字串提取 HH:MM，避免 Date 物件做時區轉換。
+ */
 function formatTime(isoString: string): string {
   if (!isoString) return '--:--';
-  const date = new Date(isoString);
-  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  // 直接從 ISO 字串提取 "HH:MM"（位置固定在 T 後面）
+  const tIndex = isoString.indexOf('T');
+  if (tIndex === -1) return '--:--';
+  return isoString.substring(tIndex + 1, tIndex + 6); // "HH:MM"
 }
 
-/** 計算是否跨日 */
+/**
+ * 計算是否跨日（基於日期字串比較，不依賴 Date 物件的時區轉換）
+ */
 function getDayDiff(departure: string, arrival: string): number {
   if (!departure || !arrival) return 0;
-  const depDate = new Date(departure);
-  const arrDate = new Date(arrival);
-  const depDay = new Date(depDate.getFullYear(), depDate.getMonth(), depDate.getDate());
-  const arrDay = new Date(arrDate.getFullYear(), arrDate.getMonth(), arrDate.getDate());
-  return Math.round((arrDay.getTime() - depDay.getTime()) / (1000 * 60 * 60 * 24));
+  // 提取日期部分 "YYYY-MM-DD"
+  const depDate = departure.substring(0, 10);
+  const arrDate = arrival.substring(0, 10);
+  if (depDate === arrDate) return 0;
+  // 用 Date 計算天數差（只用日期部分，不涉及時區）
+  const dep = new Date(depDate + 'T00:00:00');
+  const arr = new Date(arrDate + 'T00:00:00');
+  return Math.round((arr.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /** 格式化飛行時長 */
@@ -117,9 +129,12 @@ export default function FlightCard({
 
           {/* 起降時間 */}
           <div className="flex items-center gap-1.5 flex-1 justify-center">
-            <span className="text-lg font-semibold font-mono">
-              {formatTime(flight.departure_time)}
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="text-lg font-semibold font-mono">
+                {formatTime(flight.departure_time)}
+              </span>
+              <span className="text-[9px] text-muted-foreground/70">當地</span>
+            </div>
             <div className="flex flex-col items-center gap-0.5 px-2">
               <span className="text-[10px] text-muted-foreground">
                 {formatDuration(flight.flight_duration_minutes)}
@@ -140,10 +155,11 @@ export default function FlightCard({
                 {flight.stops === 0 ? '直飛' : `${flight.stops} 次停靠`}
               </span>
             </div>
-            <div className="relative">
+            <div className="relative flex flex-col items-center">
               <span className="text-lg font-semibold font-mono">
                 {formatTime(flight.arrival_time)}
               </span>
+              <span className="text-[9px] text-muted-foreground/70">當地</span>
               {dayDiff > 0 && (
                 <span className="absolute -top-1 -right-4 text-[10px] text-amber-500 font-semibold">
                   +{dayDiff}

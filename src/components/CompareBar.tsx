@@ -11,8 +11,9 @@ function formatPrice(price: number): string {
 
 function formatTime(isoString: string): string {
   if (!isoString) return '--:--';
-  const date = new Date(isoString);
-  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const tIndex = isoString.indexOf('T');
+  if (tIndex === -1) return '--:--';
+  return isoString.substring(tIndex + 1, tIndex + 6);
 }
 
 function formatDuration(minutes: number): string {
