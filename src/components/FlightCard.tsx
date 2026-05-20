@@ -119,11 +119,18 @@ export default function FlightCard({
                 {flight.airline_code}
               </div>
             )}
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium truncate">{flight.airline_name_zh}</span>
-              <span className="text-[10px] text-muted-foreground font-mono">
-                {flight.flight_number}
-              </span>
+            <div className="flex flex-col min-w-0 gap-0.5">
+              <span className="text-sm font-medium truncate leading-none">{flight.airline_name_zh}</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] text-muted-foreground font-mono leading-none">
+                  {flight.flight_number}
+                </span>
+                {flight.source === 'serpapi' ? (
+                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 py-0 text-emerald-500 border-emerald-500/30">Google</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 py-0 text-blue-500 border-blue-500/30">Duffel</Badge>
+                )}
+              </div>
             </div>
           </div>
 

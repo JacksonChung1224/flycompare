@@ -43,6 +43,7 @@ export interface FlightResult {
   stops: number;
   duffel_offer_id: string;
   fetched_at: string;
+  source: 'duffel' | 'serpapi';
 }
 
 // --- API 請求/回應型別 ---

@@ -8,6 +8,7 @@ import {
   convertToTWD,
   getAirlineNameZh,
 } from '@/lib/duffel';
+import { searchFlightsViaSerpApi } from '@/lib/serpapi';
 import type { SearchRequest, FlightResult, RouteResult, SearchRoute } from '@/lib/types';
 
 // 強制動態路由（不快取）
@@ -82,108 +83,135 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 用 Promise.allSettled() 並行呼叫 Duffel API
+    // 3. 用 Promise.allSettled() 並行處理所有航線
     const duffelClient = getDuffel();
-    const duffelPromises = routes.map((route: SearchRoute, index: number) => {
+    const results: RouteResult[] = [];
+
+    // 平行處理所有航線，避免 for 迴圈阻塞
+    const routePromises = routes.map(async (route: SearchRoute, index: number) => {
       const routeInput = body.routes[index];
-      return duffelClient.offerRequests.create({
+
+      // Duffel Promise
+      const duffelPromise = duffelClient.offerRequests.create({
         slices: buildSlices(routeInput, body.departureDate, body.returnDate, body.tripType),
         passengers: buildPassengers(body.passengerCount),
         cabin_class: body.cabinClass,
         return_offers: true,
       });
-    });
 
-    const settledResults = await Promise.allSettled(duffelPromises);
-
-    // 4. 處理每條航線的結果
-    const results: RouteResult[] = [];
-
-    for (let i = 0; i < settledResults.length; i++) {
-      const settled = settledResults[i];
-      const route = routes[i] as SearchRoute;
-
-      if (settled.status === 'rejected') {
-        console.error(`Route ${route.origin}->${route.destination} failed:`, settled.reason);
-        results.push({
-          route,
-          flights: [],
-          error: `查詢 ${route.origin} → ${route.destination} 失敗: ${settled.reason?.message || '未知錯誤'}`,
-        });
-        continue;
-      }
-
-      const offerRequest = settled.value.data;
-      const offers = offerRequest.offers || [];
-
-      // 按價格排序，取前 5 筆最便宜的
-      const sortedOffers = offers
-        .sort((a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount))
-        .slice(0, 5);
-
-      const flightResults: FlightResult[] = sortedOffers.map((offer) => {
-        // 取第一個 slice 的資訊（去程）
-        const firstSlice = offer.slices[0];
-        const segments = firstSlice?.segments || [];
-        const firstSegment = segments[0];
-        const lastSegment = segments[segments.length - 1];
-
-        // 航空公司資訊
-        const carrier = firstSegment?.operating_carrier || firstSegment?.marketing_carrier;
-        const airlineCode = carrier?.iata_code || 'ZZ';
-        const flightNumber = `${firstSegment?.marketing_carrier?.iata_code || airlineCode}${firstSegment?.marketing_carrier_flight_number || ''}`;
-
-        // 起降時間
-        const departureTime = firstSegment?.departing_at || '';
-        const arrivalTime = lastSegment?.arriving_at || '';
-
-        // 飛行時長
-        const durationMinutes = parseDurationToMinutes(firstSlice?.duration || null);
-
-        // 票價
-        const priceOriginal = parseFloat(offer.total_amount);
-        const priceCurrency = offer.total_currency;
-        const priceTwd = convertToTWD(priceOriginal, priceCurrency);
-
-        // 行李資訊 - 從第一個 segment 的第一個 passenger 取得
-        const passengerBaggages = firstSegment?.passengers?.[0]?.baggages || [];
-        const checkedBaggage = passengerBaggages.find((b) => b.type === 'checked');
-        const carryOnBaggage = passengerBaggages.find((b) => b.type === 'carry_on');
-
-        // 碳排放
-        const carbonEmissions = offer.total_emissions_kg
-          ? parseFloat(offer.total_emissions_kg)
-          : null;
-
-        // 停靠次數
-        const stops = segments.length - 1;
-
-        return {
-          id: '', // 由 Supabase 自動生成
-          route_id: route.id,
-          airline_code: airlineCode,
-          airline_name_zh: getAirlineNameZh(airlineCode),
-          flight_number: flightNumber,
-          departure_time: departureTime,
-          arrival_time: arrivalTime,
-          flight_duration_minutes: durationMinutes,
-          price_twd: priceTwd,
-          price_currency_original: priceCurrency,
-          price_original: priceOriginal,
-          checked_baggage_kg: null, // Duffel baggages 只回傳 quantity，不一定有 weight
-          checked_baggage_pieces: checkedBaggage?.quantity ?? null,
-          carry_on_kg: null,
-          carry_on_pieces: carryOnBaggage?.quantity ?? null,
-          carbon_emissions_kg: carbonEmissions,
-          stops,
-          duffel_offer_id: offer.id,
-          fetched_at: new Date().toISOString(),
-        } as FlightResult;
+      // SerpApi Promise
+      const serpapiPromise = searchFlightsViaSerpApi({
+        origin: routeInput.origin,
+        destination: routeInput.destination,
+        departureDate: body.departureDate,
+        returnDate: body.returnDate,
+        tripType: body.tripType,
+        cabinClass: body.cabinClass,
+        passengers: body.passengerCount,
+        routeId: route.id,
       });
 
-      // 5. 寫入 Supabase flight_results
-      if (flightResults.length > 0) {
-        const insertData = flightResults.map((f) => ({
+      // 等待兩個來源
+      const [duffelResult, serpapiResult] = await Promise.allSettled([
+        duffelPromise,
+        serpapiPromise,
+      ]);
+
+      let flightResults: FlightResult[] = [];
+
+      // 處理 Duffel 結果
+      if (duffelResult.status === 'fulfilled') {
+        const offerRequest = duffelResult.value.data;
+        const offers = offerRequest.offers || [];
+
+        const duffelFlights: FlightResult[] = offers.map((offer) => {
+          const firstSlice = offer.slices[0];
+          const segments = firstSlice?.segments || [];
+          const firstSegment = segments[0];
+          const lastSegment = segments[segments.length - 1];
+
+          const carrier = firstSegment?.operating_carrier || firstSegment?.marketing_carrier;
+          const airlineCode = carrier?.iata_code || 'ZZ';
+          const flightNumber = `${firstSegment?.marketing_carrier?.iata_code || airlineCode}${firstSegment?.marketing_carrier_flight_number || ''}`;
+
+          const departureTime = firstSegment?.departing_at || '';
+          const arrivalTime = lastSegment?.arriving_at || '';
+          const durationMinutes = parseDurationToMinutes(firstSlice?.duration || null);
+
+          const priceOriginal = parseFloat(offer.total_amount);
+          const priceCurrency = offer.total_currency;
+          const priceTwd = convertToTWD(priceOriginal, priceCurrency);
+
+          const passengerBaggages = firstSegment?.passengers?.[0]?.baggages || [];
+          const checkedBaggage = passengerBaggages.find((b) => b.type === 'checked');
+          const carryOnBaggage = passengerBaggages.find((b) => b.type === 'carry_on');
+
+          const carbonEmissions = offer.total_emissions_kg
+            ? parseFloat(offer.total_emissions_kg)
+            : null;
+
+          const stops = segments.length - 1;
+
+          return {
+            id: '',
+            route_id: route.id,
+            airline_code: airlineCode,
+            airline_name_zh: getAirlineNameZh(airlineCode),
+            flight_number: flightNumber.replace(/\s+/g, ''),
+            departure_time: departureTime,
+            arrival_time: arrivalTime,
+            flight_duration_minutes: durationMinutes,
+            price_twd: priceTwd,
+            price_currency_original: priceCurrency,
+            price_original: priceOriginal,
+            checked_baggage_kg: null,
+            checked_baggage_pieces: checkedBaggage?.quantity ?? null,
+            carry_on_kg: null,
+            carry_on_pieces: carryOnBaggage?.quantity ?? null,
+            carbon_emissions_kg: carbonEmissions,
+            stops,
+            duffel_offer_id: offer.id,
+            fetched_at: new Date().toISOString(),
+            source: 'duffel' as const,
+          };
+        });
+
+        flightResults = [...flightResults, ...duffelFlights];
+      } else {
+        console.error(`Duffel Route ${route.origin}->${route.destination} failed:`, duffelResult.reason);
+      }
+
+      // 處理 SerpApi 結果
+      if (serpapiResult.status === 'fulfilled') {
+        flightResults = [...flightResults, ...serpapiResult.value];
+      } else {
+        console.error(`SerpApi Route ${route.origin}->${route.destination} failed:`, serpapiResult.reason);
+      }
+
+      // 去重與排序 (以 航班編號 + 出發時間 為 key)
+      const uniqueFlights = new Map<string, FlightResult>();
+      for (const flight of flightResults) {
+        // SerpApi 的時間字串可能會差個幾分鐘或格式些微不同，這裡只取日期+小時來簡化判斷
+        const depTimePrefix = flight.departure_time.substring(0, 13); // "YYYY-MM-DDTHH"
+        const key = `${flight.flight_number}_${depTimePrefix}`;
+        
+        if (!uniqueFlights.has(key)) {
+          uniqueFlights.set(key, flight);
+        } else {
+          // 若重複，保留 Duffel (因為有行李、offer_id 可供後續訂票)
+          const existing = uniqueFlights.get(key)!;
+          if (existing.source === 'serpapi' && flight.source === 'duffel') {
+            uniqueFlights.set(key, flight);
+          }
+        }
+      }
+
+      const sortedUniqueFlights = Array.from(uniqueFlights.values())
+        .sort((a, b) => a.price_twd - b.price_twd)
+        .slice(0, 10); // 取前 10 筆最便宜的
+
+      if (sortedUniqueFlights.length > 0) {
+        const insertData = sortedUniqueFlights.map((f) => ({
           route_id: f.route_id,
           airline_code: f.airline_code,
           airline_name_zh: f.airline_name_zh,
@@ -201,6 +229,7 @@ export async function POST(request: NextRequest) {
           carbon_emissions_kg: f.carbon_emissions_kg,
           stops: f.stops,
           duffel_offer_id: f.duffel_offer_id,
+          source: f.source,
         }));
 
         const { data: inserted, error: insertError } = await supabaseAdmin
@@ -212,17 +241,28 @@ export async function POST(request: NextRequest) {
           console.error('Failed to insert flight results:', insertError);
         }
 
-        // 用 Supabase 回傳的含 id 資料更新結果
-        if (inserted) {
-          results.push({ route, flights: inserted as FlightResult[] });
-        } else {
-          results.push({ route, flights: flightResults });
-        }
+        return {
+          route,
+          flights: inserted ? (inserted as FlightResult[]) : sortedUniqueFlights,
+        };
       } else {
-        results.push({
+        return {
           route,
           flights: [],
           error: `${route.origin} → ${route.destination} 沒有找到符合條件的航班`,
+        };
+      }
+    });
+
+    const settledRoutes = await Promise.allSettled(routePromises);
+    for (const settled of settledRoutes) {
+      if (settled.status === 'fulfilled') {
+        results.push(settled.value);
+      } else {
+        results.push({
+          route: routes[0], // fallback
+          flights: [],
+          error: '查詢該航線時發生內部錯誤',
         });
       }
     }
