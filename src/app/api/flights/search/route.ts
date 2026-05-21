@@ -39,11 +39,27 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAdmin = createAdminClient();
+    
+    // 取得當前使用者 (來自 cookies)
+    // 這裡我們不使用 supabaseAdmin 來取 auth，而是建立一個針對請求的 server client
+    // 雖然 API route 內操作 Supabase 直接用 service role 也可，但要知道「是誰發出請求」，必須從 request headers/cookies 解析 token
+    let userId = null;
+    try {
+      const { createClient } = await import('@/lib/supabase/server');
+      const supabaseServer = await createClient();
+      const { data: { user } } = await supabaseServer.auth.getUser();
+      if (user) {
+        userId = user.id;
+      }
+    } catch (e) {
+      console.error('Failed to get user session:', e);
+    }
 
     // 1. 建立 search_session
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('search_sessions')
       .insert({
+        user_id: userId,
         passenger_count: body.passengerCount,
         trip_type: body.tripType,
         cabin_class: body.cabinClass,

@@ -5,6 +5,8 @@ import SearchForm from '@/components/SearchForm';
 import ResultsGrid from '@/components/ResultsGrid';
 import CompareBar from '@/components/CompareBar';
 import ThemeToggle from '@/components/ThemeToggle';
+import AuthButton from '@/components/AuthButton';
+import SearchHistory from '@/components/SearchHistory';
 import { Plane } from 'lucide-react';
 import type {
   CabinClass,
@@ -135,7 +137,10 @@ export default function Home() {
               機票多點統整比價
             </span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <AuthButton />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -159,6 +164,11 @@ export default function Home() {
         <section className="mb-6 md:mb-8">
           <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         </section>
+
+        {/* 歷史搜尋紀錄 (僅在無搜尋結果且剛載入時顯示) */}
+        {routeStates.length === 0 && (
+          <SearchHistory onSelectHistory={handleSearch} />
+        )}
 
         {/* 搜尋結果 */}
         {routeStates.length > 0 && (
