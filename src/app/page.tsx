@@ -160,18 +160,16 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-gradient-to-b from-primary/10 via-background to-background">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <Plane className="h-4 w-4 text-white" />
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/20">
+              <Plane className="h-4 w-4 text-primary-foreground" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                FlyCompare
-              </span>
+            <h1 className="text-lg font-bold tracking-tight text-primary">
+              FlyCompare
             </h1>
             <span className="hidden sm:inline text-xs text-muted-foreground">
               機票多點統整比價
@@ -188,11 +186,9 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Hero 區塊（僅搜尋前顯示） */}
         {routeStates.length === 0 && (
-          <div className="text-center mb-8 md:mb-10">
-            <h2 className="text-2xl md:text-4xl font-bold mb-3 tracking-tight">
-              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                同時比較多個目的地
-              </span>
+          <div className="text-center mb-8 md:mb-12 mt-4 md:mt-8">
+            <h2 className="text-3xl md:text-5xl font-extrabold mb-4 tracking-tight text-foreground">
+              同時比較多個目的地
             </h2>
             <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
               不需開啟多個分頁，在單一畫面搜尋並比較不同目的地的航班與票價

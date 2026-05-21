@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Plane } from 'lucide-react';
+import { AlertCircle, Plane, ChevronDown, ChevronUp } from 'lucide-react';
 import FlightCard from './FlightCard';
 import SkeletonCard from './SkeletonCard';
 import type { RouteSearchState, FlightResult, CompareSelection } from '@/lib/types';
@@ -73,6 +73,17 @@ export default function ResultsGrid({
   compareSelections,
   onCompareToggle,
 }: ResultsGridProps) {
+  const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (routeIndex: number) => {
+    setExpandedRoutes(prev => {
+      const next = new Set(prev);
+      if (next.has(routeIndex)) next.delete(routeIndex);
+      else next.add(routeIndex);
+      return next;
+    });
+  };
+
   if (routeStates.length === 0) return null;
 
   return (
@@ -151,22 +162,51 @@ export default function ResultsGrid({
               )}
 
               {/* 航班結果 */}
-              {routeState.status === 'success' &&
-                routeState.flights.map((flight) => {
-                  const isSelected = compareSelections.some(
-                    (s) => s.flight.duffel_offer_id === flight.duffel_offer_id
-                  );
-                  return (
-                    <FlightCard
-                      key={flight.duffel_offer_id || flight.id}
-                      flight={flight}
-                      isLowestPrice={flight.price_twd === lowestPrice}
-                      isCompareSelected={isSelected}
-                      onCompareToggle={() => onCompareToggle(routeIndex, flight)}
-                      compareDisabled={compareSelections.length >= 2}
-                    />
-                  );
-                })}
+              {routeState.status === 'success' && (() => {
+                const isExpanded = expandedRoutes.has(routeIndex);
+                const visibleFlights = isExpanded ? routeState.flights : routeState.flights.slice(0, 3);
+                
+                return (
+                  <>
+                    <div className="space-y-3 relative">
+                      {visibleFlights.map((flight) => {
+                        const isSelected = compareSelections.some(
+                          (s) => s.flight.duffel_offer_id === flight.duffel_offer_id
+                        );
+                        return (
+                          <FlightCard
+                            key={flight.duffel_offer_id || flight.id}
+                            flight={flight}
+                            isLowestPrice={flight.price_twd === lowestPrice}
+                            isCompareSelected={isSelected}
+                            onCompareToggle={() => onCompareToggle(routeIndex, flight)}
+                            compareDisabled={compareSelections.length >= 2}
+                          />
+                        );
+                      })}
+                      
+                      {/* 如果沒有展開且有更多結果，顯示漸層遮罩 */}
+                      {!isExpanded && routeState.flights.length > 3 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+                      )}
+                    </div>
+
+                    {/* 展開/收起 按鈕 */}
+                    {routeState.flights.length > 3 && (
+                      <button
+                        onClick={() => toggleExpand(routeIndex)}
+                        className="w-full mt-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-colors flex items-center justify-center gap-1 border border-primary/20"
+                      >
+                        {isExpanded ? (
+                          <>收起 <ChevronUp className="h-4 w-4" /></>
+                        ) : (
+                          <>展開看其餘 {routeState.flights.length - 3} 筆結果 <ChevronDown className="h-4 w-4" /></>
+                        )}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         );
