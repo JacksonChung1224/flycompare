@@ -67,7 +67,7 @@ function AirportInput({
       a.code.toLowerCase().includes(qLower) ||
       a.cityZh.includes(q) ||
       a.nameZh.includes(q)
-    ).slice(0, 8);
+    ).slice(0, 15);
     setResults(filtered);
   }, []);
 
