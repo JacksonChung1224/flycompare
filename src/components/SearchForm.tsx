@@ -162,7 +162,7 @@ function AirportInput({
           type="text"
           value={query}
           placeholder={placeholder}
-          className="w-full h-10 md:h-12 pl-10 pr-3 rounded-md border-0 bg-transparent text-base md:text-lg font-bold text-foreground focus:ring-0 placeholder:text-muted-foreground/40 placeholder:font-normal transition-colors"
+          className="w-full h-10 md:h-12 pl-10 pr-16 rounded-md border-0 bg-transparent text-base md:text-lg font-bold text-foreground focus:ring-0 placeholder:text-muted-foreground/40 placeholder:font-normal transition-colors"
           onChange={(e) => {
             setQuery(e.target.value);
             setSelectedAirport(null);
@@ -173,12 +173,12 @@ function AirportInput({
         {selectedAirport && (
           <Badge 
             variant="secondary" 
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm flex items-center gap-1.5 py-1 px-2.5 cursor-pointer bg-secondary/80 hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 group"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 text-xs flex items-center gap-1 py-0.5 px-2 cursor-pointer bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 rounded-full shadow-sm"
             onClick={handleClear}
             title="清除選項"
           >
-            <span className="font-medium">{selectedAirport.code}</span>
-            <X className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+            <X className="w-3.5 h-3.5" />
+            <span className="font-medium">清除</span>
           </Badge>
         )}
       </div>
@@ -245,7 +245,7 @@ function AirportInput({
               ].filter(group => group.data.length > 0).map((group, idx) => (
                 <div key={idx}>
                   <div className="text-xs font-semibold text-muted-foreground mb-2">{group.title}</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     {group.data.map((d) => (
                       <button
                         key={d.code}
@@ -273,7 +273,7 @@ function AirportInput({
             <div className="p-3 space-y-4">
               <div>
                 <div className="text-xs font-semibold text-muted-foreground mb-2">🇹🇼 台灣出發</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {TAIWAN_ORIGINS.map((d) => {
                     // 如果使用者先選了目的地，我們要檢查這個出發地有沒有飛那裡
                     const isValid = isRecommendedRoute(d.code, pairedAirportCode);
