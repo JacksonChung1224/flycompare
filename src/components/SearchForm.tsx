@@ -33,10 +33,10 @@ import { isRecommendedRoute } from '@/lib/route-mapping';
 
 // 台灣主要出發地 (For Origin dropdown)
 const TAIWAN_ORIGINS = [
-  { code: 'TPE', cityZh: '桃園', emoji: '✈️' },
-  { code: 'KHH', cityZh: '高雄', emoji: '⚓' },
-  { code: 'TSA', cityZh: '松山', emoji: '🏙️' },
-  { code: 'RMQ', cityZh: '台中', emoji: '☀️' },
+  { code: 'TPE', cityZh: '桃園', nameZh: '桃園國際機場', emoji: '✈️' },
+  { code: 'KHH', cityZh: '高雄', nameZh: '小港機場', emoji: '⚓' },
+  { code: 'TSA', cityZh: '台北', nameZh: '松山機場', emoji: '🏙️' },
+  { code: 'RMQ', cityZh: '台中', nameZh: '清泉崗機場', emoji: '☀️' },
 ];
 
 // ============================================================
@@ -245,17 +245,17 @@ function AirportInput({
               ].filter(group => group.data.length > 0).map((group, idx) => (
                 <div key={idx}>
                   <div className="text-xs font-semibold text-muted-foreground mb-2">{group.title}</div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {group.data.map((d) => (
                       <button
                         key={d.code}
                         onClick={() => handleSelect(d.code, d.cityZh)}
-                        title={d.cityZh}
-                        className="text-left bg-background hover:bg-accent hover:border-primary/40 border border-border/50 p-2.5 rounded-lg transition-all flex items-center justify-between group"
+                        title={`${d.cityZh} ${d.nameZh}`}
+                        className="text-left bg-background hover:bg-accent hover:border-primary/40 border border-border/50 px-3 py-2.5 rounded-lg transition-all flex items-center gap-2.5 group"
                       >
-                        <span className="truncate text-sm font-medium pr-2 text-foreground/90 group-hover:text-primary transition-colors flex items-center">
-                          <span className="mr-2 text-base">{d.emoji}</span> 
-                          <span className="truncate">{d.cityZh}</span>
+                        <span className="text-lg shrink-0">{d.emoji}</span>
+                        <span className="flex-1 min-w-0 flex flex-col">
+                          <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">{d.cityZh}・{d.nameZh}</span>
                         </span>
                         <span className="font-mono text-xs text-muted-foreground font-semibold bg-muted/50 group-hover:bg-primary/10 group-hover:text-primary px-1.5 py-0.5 rounded shrink-0 transition-colors">
                           {d.code}
@@ -273,7 +273,7 @@ function AirportInput({
             <div className="p-3 space-y-4">
               <div>
                 <div className="text-xs font-semibold text-muted-foreground mb-2">🇹🇼 台灣出發</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {TAIWAN_ORIGINS.map((d) => {
                     // 如果使用者先選了目的地，我們要檢查這個出發地有沒有飛那裡
                     const isValid = isRecommendedRoute(d.code, pairedAirportCode);
@@ -283,12 +283,12 @@ function AirportInput({
                       <button
                         key={d.code}
                         onClick={() => handleSelect(d.code, d.cityZh)}
-                        title={d.cityZh}
-                        className="text-left bg-background hover:bg-accent hover:border-primary/40 border border-border/50 p-2.5 rounded-lg transition-all flex items-center justify-between group"
+                        title={`${d.cityZh} ${d.nameZh}`}
+                        className="text-left bg-background hover:bg-accent hover:border-primary/40 border border-border/50 px-3 py-2.5 rounded-lg transition-all flex items-center gap-2.5 group"
                       >
-                        <span className="truncate text-sm font-medium pr-2 text-foreground/90 group-hover:text-primary transition-colors flex items-center">
-                          <span className="mr-2 text-base">{d.emoji}</span> 
-                          <span className="truncate">{d.cityZh}</span>
+                        <span className="text-lg shrink-0">{d.emoji}</span>
+                        <span className="flex-1 min-w-0 flex flex-col">
+                          <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">{d.cityZh}・{d.nameZh}</span>
                         </span>
                         <span className="font-mono text-xs text-muted-foreground font-semibold bg-muted/50 group-hover:bg-primary/10 group-hover:text-primary px-1.5 py-0.5 rounded shrink-0 transition-colors">
                           {d.code}
