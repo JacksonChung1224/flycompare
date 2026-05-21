@@ -29,6 +29,15 @@ import type { Airport, CabinClass, TripType, RouteInput } from '@/lib/types';
 
 import { AIRPORTS } from '@/lib/airports-data';
 import { POPULAR_DESTINATIONS, HOT_PICKS } from '@/lib/popular-destinations';
+import { isRecommendedRoute } from '@/lib/route-mapping';
+
+// 台灣主要出發地 (For Origin dropdown)
+const TAIWAN_ORIGINS = [
+  { code: 'TPE', cityZh: '桃園', emoji: '✈️' },
+  { code: 'KHH', cityZh: '高雄', emoji: '⚓' },
+  { code: 'TSA', cityZh: '松山', emoji: '🏙️' },
+  { code: 'RMQ', cityZh: '台中', emoji: '☀️' },
+];
 
 // ============================================================
 // AirportInput 子元件：機場搜尋輸入框 + 自動補全 + 熱門目的地
@@ -40,6 +49,7 @@ function AirportInput({
   onSelect,
   isDestination = false,
   recentDestinations = [],
+  pairedAirportCode,
 }: {
   value: string;
   label: string;
@@ -47,6 +57,7 @@ function AirportInput({
   onSelect: (airport: { code: string; cityZh: string; nameZh?: string }) => void;
   isDestination?: boolean;
   recentDestinations?: { code: string; cityZh: string }[];
+  pairedAirportCode?: string;
 }) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<Airport[]>([]);
@@ -104,6 +115,19 @@ function AirportInput({
   };
 
   const showPopular = isDestination && !query;
+  const showOriginPicks = !isDestination && !query;
+
+  // 過濾目的地
+  const filteredHotPicks = HOT_PICKS.filter(d => 
+    isRecommendedRoute(pairedAirportCode, d.code)
+  );
+  
+  const getFilteredDestinations = (country: string, tag?: string) => {
+    return POPULAR_DESTINATIONS.filter(d => {
+      const matchCountryOrTag = tag ? d.tags?.includes(tag) : d.countryZh === country;
+      return matchCountryOrTag && isRecommendedRoute(pairedAirportCode, d.code);
+    });
+  };
 
   return (
     <div className="relative flex-1 min-w-0">
@@ -185,11 +209,11 @@ function AirportInput({
 
               {/* 熱門分類 */}
               {[
-                { title: '🔥 台灣人最愛', data: HOT_PICKS },
-                { title: '🇯🇵 日本', data: POPULAR_DESTINATIONS.filter(d => d.countryZh === '日本') },
-                { title: '🇰🇷 韓國', data: POPULAR_DESTINATIONS.filter(d => d.countryZh === '韓國') },
-                { title: '🌏 東南亞', data: POPULAR_DESTINATIONS.filter(d => d.tags?.includes('東南亞')) },
-              ].map((group, idx) => (
+                { title: '🔥 台灣人最愛', data: filteredHotPicks },
+                { title: '🇯🇵 日本', data: getFilteredDestinations('日本') },
+                { title: '🇰🇷 韓國', data: getFilteredDestinations('韓國') },
+                { title: '🌏 東南亞', data: getFilteredDestinations('東南亞', '東南亞') },
+              ].filter(group => group.data.length > 0).map((group, idx) => (
                 <div key={idx}>
                   <div className="text-xs font-semibold text-muted-foreground mb-2">{group.title}</div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -206,6 +230,33 @@ function AirportInput({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 未輸入：顯示出發地快選 (僅出發地) */}
+          {showOriginPicks && (
+            <div className="p-3 space-y-4">
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground mb-2">🇹🇼 台灣出發</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {TAIWAN_ORIGINS.map((d) => {
+                    // 如果使用者先選了目的地，我們要檢查這個出發地有沒有飛那裡
+                    const isValid = isRecommendedRoute(d.code, pairedAirportCode);
+                    if (!isValid) return null; // 隱藏沒有直飛的選項
+
+                    return (
+                      <button
+                        key={d.code}
+                        onClick={() => handleSelect(d.code, d.cityZh)}
+                        className="text-left text-xs bg-background hover:bg-accent border border-border/50 px-3 py-2 rounded-md transition-colors flex items-center justify-between"
+                      >
+                        <span className="truncate pr-1">{d.emoji} {d.cityZh}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{d.code}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -460,6 +511,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
               placeholder="城市或機場代碼 (如 TPE)"
               onSelect={(airport) => updateOrigin(route.id, airport)}
               isDestination={false}
+              pairedAirportCode={route.destinationCode}
             />
 
             <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mb-2" />
@@ -472,6 +524,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
               onSelect={(airport) => updateDestination(route.id, airport)}
               isDestination={true}
               recentDestinations={recentDestinations}
+              pairedAirportCode={route.originCode}
             />
 
             {/* 刪除按鈕（第一組不可刪除） */}
