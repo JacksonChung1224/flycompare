@@ -47,6 +47,7 @@ function AirportInput({
   label,
   placeholder,
   onSelect,
+  onClear,
   isDestination = false,
   recentDestinations = [],
   pairedAirportCode,
@@ -55,6 +56,7 @@ function AirportInput({
   label: string;
   placeholder: string;
   onSelect: (airport: { code: string; cityZh: string; nameZh?: string }) => void;
+  onClear?: () => void;
   isDestination?: boolean;
   recentDestinations?: { code: string; cityZh: string }[];
   pairedAirportCode?: string;
@@ -62,9 +64,19 @@ function AirportInput({
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<Airport[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedAirport, setSelectedAirport] = useState<{ code: string } | null>(null);
+  const [selectedAirport, setSelectedAirport] = useState<{ code: string } | null>(value ? { code: value.split(' ').pop() || '' } : null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync state if value changes from outside (e.g. from history click)
+  useEffect(() => {
+    setQuery(value);
+    if (value) {
+      setSelectedAirport({ code: value.split(' ').pop() || '' });
+    } else {
+      setSelectedAirport(null);
+    }
+  }, [value]);
 
   // 前端即時搜尋邏輯
   const searchAirports = useCallback((q: string) => {
@@ -114,6 +126,14 @@ function AirportInput({
     onSelect({ code, cityZh, nameZh });
   };
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuery('');
+    setSelectedAirport(null);
+    setIsOpen(true);
+    if (onClear) onClear();
+  };
+
   const showPopular = isDestination && !query;
   const showOriginPicks = !isDestination && !query;
 
@@ -132,7 +152,7 @@ function AirportInput({
   return (
     <div className="relative flex-1 min-w-0">
       <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-      <div className="relative">
+      <div className="relative group">
         <Plane className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
           ref={inputRef}
@@ -148,8 +168,15 @@ function AirportInput({
           onFocus={() => setIsOpen(true)}
         />
         {selectedAirport && (
-          <Badge variant="secondary" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs">
+          <Badge variant="secondary" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs flex items-center gap-1 pr-1">
             {selectedAirport.code}
+            <div 
+              className="hover:bg-background/80 rounded-full p-0.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleClear}
+              title="清除選項"
+            >
+              <X className="w-3 h-3" />
+            </div>
           </Badge>
         )}
       </div>
@@ -221,6 +248,7 @@ function AirportInput({
                       <button
                         key={d.code}
                         onClick={() => handleSelect(d.code, d.cityZh)}
+                        title={d.cityZh}
                         className="text-left text-xs bg-background hover:bg-accent border border-border/50 px-2 py-1.5 rounded-md transition-colors flex items-center justify-between"
                       >
                         <span className="truncate pr-1">{d.emoji} {d.cityZh}</span>
@@ -248,6 +276,7 @@ function AirportInput({
                       <button
                         key={d.code}
                         onClick={() => handleSelect(d.code, d.cityZh)}
+                        title={d.cityZh}
                         className="text-left text-xs bg-background hover:bg-accent border border-border/50 px-3 py-2 rounded-md transition-colors flex items-center justify-between"
                       >
                         <span className="truncate pr-1">{d.emoji} {d.cityZh}</span>
@@ -510,6 +539,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
               label="出發地"
               placeholder="城市或機場代碼 (如 TPE)"
               onSelect={(airport) => updateOrigin(route.id, airport)}
+              onClear={() => updateOrigin(route.id, { code: '', cityZh: '' })}
               isDestination={false}
               pairedAirportCode={route.destinationCode}
             />
@@ -522,6 +552,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
               label="目的地"
               placeholder="城市或機場代碼 (如 NRT)"
               onSelect={(airport) => updateDestination(route.id, airport)}
+              onClear={() => updateDestination(route.id, { code: '', cityZh: '' })}
               isDestination={true}
               recentDestinations={recentDestinations}
               pairedAirportCode={route.originCode}
