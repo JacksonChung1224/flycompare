@@ -16,6 +16,8 @@ export const POPULAR_DESTINATIONS: PopularDestination[] = [
   { code: 'OKA', cityZh: '沖繩',         cityEn: 'Okinawa',         countryZh: '日本', emoji: '🌊', tags: ['日本'] },
   { code: 'CTS', cityZh: '札幌',         cityEn: 'Sapporo',         countryZh: '日本', emoji: '❄️', tags: ['日本'] },
   { code: 'NGO', cityZh: '名古屋',       cityEn: 'Nagoya',          countryZh: '日本', emoji: '🏟️', tags: ['日本'] },
+  { code: 'KMJ', cityZh: '熊本',         cityEn: 'Kumamoto',        countryZh: '日本', emoji: '🐻', tags: ['日本'] },
+  { code: 'HKD', cityZh: '函館',         cityEn: 'Hakodate',        countryZh: '日本', emoji: '🦑', tags: ['日本'] },
 
   // ── 🇰🇷 韓國 ──
   { code: 'ICN', cityZh: '首爾（仁川）', cityEn: 'Seoul Incheon',   countryZh: '韓國', emoji: '🇰🇷', tags: ['韓國','熱門'] },
