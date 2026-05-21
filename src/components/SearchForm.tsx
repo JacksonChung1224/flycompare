@@ -168,15 +168,14 @@ function AirportInput({
           onFocus={() => setIsOpen(true)}
         />
         {selectedAirport && (
-          <Badge variant="secondary" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs flex items-center gap-1 pr-1">
-            {selectedAirport.code}
-            <div 
-              className="hover:bg-background/80 rounded-full p-0.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
-              onClick={handleClear}
-              title="清除選項"
-            >
-              <X className="w-3 h-3" />
-            </div>
+          <Badge 
+            variant="secondary" 
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm flex items-center gap-1.5 py-1 px-2.5 cursor-pointer bg-secondary/80 hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 group"
+            onClick={handleClear}
+            title="清除選項"
+          >
+            <span className="font-medium">{selectedAirport.code}</span>
+            <X className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
           </Badge>
         )}
       </div>
@@ -362,7 +361,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
     setRoutes(
       routes.map((r) =>
         r.id === id
-          ? { ...r, origin: `${airport.cityZh} ${airport.code}`, originCode: airport.code }
+          ? { ...r, origin: airport.code ? `${airport.cityZh} ${airport.code}` : '', originCode: airport.code }
           : r
       )
     );
@@ -375,7 +374,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
         r.id === id
           ? {
               ...r,
-              destination: `${airport.cityZh} ${airport.code}`,
+              destination: airport.code ? `${airport.cityZh} ${airport.code}` : '',
               destinationCode: airport.code,
               cityZh: airport.cityZh,
             }
