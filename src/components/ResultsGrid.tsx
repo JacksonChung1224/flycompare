@@ -5,6 +5,58 @@ import { AlertCircle, Plane } from 'lucide-react';
 import FlightCard from './FlightCard';
 import SkeletonCard from './SkeletonCard';
 import type { RouteSearchState, FlightResult, CompareSelection } from '@/lib/types';
+import { useState, useEffect } from 'react';
+
+function PriceInsightBanner({ routeState, lowestPrice }: { routeState: RouteSearchState; lowestPrice: number }) {
+  const [insight, setInsight] = useState<any>(null);
+
+  useEffect(() => {
+    if (routeState.status !== 'success' || routeState.flights.length === 0) return;
+    
+    const dateStr = routeState.flights[0].departure_time.split('T')[0];
+    
+    const fetchInsight = async () => {
+      try {
+        const originCode = routeState.origin.split(' ').pop() || routeState.origin;
+        const destinationCode = routeState.destination.split(' ').pop() || routeState.destination;
+        
+        const res = await fetch(`/api/flights/price-insights?origin=${originCode}&destination=${destinationCode}&date=${dateStr}&currentPrice=${lowestPrice}`);
+        const data = await res.json();
+        if (data.success && data.insight) {
+          setInsight(data.insight);
+        }
+      } catch (e) {
+        console.error('Failed to fetch price insight:', e);
+      }
+    };
+    
+    fetchInsight();
+  }, [routeState, lowestPrice]);
+
+  if (!insight) return null;
+
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5 text-emerald-600">💡</div>
+        <div>
+          <h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">大數據省錢提示</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            根據過往搜尋紀錄，若改在 <span className="font-semibold text-foreground">{insight.alternativeDate}</span> 出發，預估可省下 <span className="font-semibold text-emerald-600 dark:text-emerald-400">NT$ {insight.savings.toLocaleString()}</span>！
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={() => {
+          alert(`提示：在正式環境中，這會將您的出發日期自動更改為 ${insight.alternativeDate} 並重新搜尋！`);
+        }}
+        className="shrink-0 text-xs px-3 py-1.5 bg-background text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900 transition-colors shadow-sm"
+      >
+        套用更便宜日期
+      </button>
+    </div>
+  );
+}
 
 export interface ResultsGridProps {
   routeStates: RouteSearchState[];
@@ -91,6 +143,11 @@ export default function ResultsGrid({
                     該航線暫無符合條件的航班
                   </p>
                 </div>
+              )}
+
+              {/* 大數據省錢提示橫幅 */}
+              {routeState.status === 'success' && routeState.flights.length > 0 && (
+                <PriceInsightBanner routeState={routeState} lowestPrice={lowestPrice} />
               )}
 
               {/* 航班結果 */}

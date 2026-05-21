@@ -51,6 +51,7 @@ function AirportInput({
   isDestination = false,
   recentDestinations = [],
   pairedAirportCode,
+  id,
 }: {
   value: string;
   label: string;
@@ -60,6 +61,7 @@ function AirportInput({
   isDestination?: boolean;
   recentDestinations?: { code: string; cityZh: string }[];
   pairedAirportCode?: string;
+  id?: string;
 }) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<Airport[]>([]);
@@ -155,6 +157,7 @@ function AirportInput({
       <div className="relative group">
         <Plane className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
+          id={id}
           ref={inputRef}
           type="text"
           value={query}
@@ -488,8 +491,12 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
               onSelect={(d) => {
                 setDepartureDate(d ?? undefined);
                 setDepartureDateOpen(false);
+                if (tripType === 'roundtrip' && !returnDate) {
+                  setTimeout(() => setReturnDateOpen(true), 150);
+                }
               }}
               disabled={(date) => date < new Date()}
+              locale={zhTW}
             />
           </PopoverContent>
         </Popover>
@@ -516,6 +523,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
                 disabled={(date) =>
                   date < new Date() || (departureDate ? date < departureDate : false)
                 }
+                locale={zhTW}
               />
             </PopoverContent>
           </Popover>
@@ -534,10 +542,14 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
             </span>
             {/* 出發機場 */}
             <AirportInput
+              id={`origin-${route.id}`}
               value={route.origin}
               label="出發地"
               placeholder="城市或機場代碼 (如 TPE)"
-              onSelect={(airport) => updateOrigin(route.id, airport)}
+              onSelect={(airport) => {
+                updateOrigin(route.id, airport);
+                setTimeout(() => document.getElementById(`dest-${route.id}`)?.focus(), 10);
+              }}
               onClear={() => updateOrigin(route.id, { code: '', cityZh: '' })}
               isDestination={false}
               pairedAirportCode={route.destinationCode}
@@ -547,10 +559,14 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
 
             {/* 目的地機場 */}
             <AirportInput
+              id={`dest-${route.id}`}
               value={route.destination}
               label="目的地"
               placeholder="城市或機場代碼 (如 NRT)"
-              onSelect={(airport) => updateDestination(route.id, airport)}
+              onSelect={(airport) => {
+                updateDestination(route.id, airport);
+                setTimeout(() => setDepartureDateOpen(true), 10);
+              }}
               onClear={() => updateDestination(route.id, { code: '', cityZh: '' })}
               isDestination={true}
               recentDestinations={recentDestinations}
