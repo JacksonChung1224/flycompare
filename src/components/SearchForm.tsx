@@ -27,46 +27,56 @@ import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import type { Airport, CabinClass, TripType, RouteInput } from '@/lib/types';
 
+import { AIRPORTS } from '@/lib/airports-data';
+import { POPULAR_DESTINATIONS, HOT_PICKS } from '@/lib/popular-destinations';
+
 // ============================================================
-// AirportInput 子元件：機場搜尋輸入框 + 自動補全
+// AirportInput 子元件：機場搜尋輸入框 + 自動補全 + 熱門目的地
 // ============================================================
 function AirportInput({
   value,
   label,
   placeholder,
   onSelect,
+  isDestination = false,
+  recentDestinations = [],
 }: {
   value: string;
   label: string;
   placeholder: string;
-  onSelect: (airport: Airport) => void;
+  onSelect: (airport: { code: string; cityZh: string; nameZh?: string }) => void;
+  isDestination?: boolean;
+  recentDestinations?: { code: string; cityZh: string }[];
 }) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<Airport[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedAirport, setSelectedAirport] = useState<Airport | null>(null);
+  const [selectedAirport, setSelectedAirport] = useState<{ code: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 搜尋機場
-  const searchAirports = useCallback(async (q: string) => {
-    try {
-      const res = await fetch(`/api/airports/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      setResults(data.airports || []);
-    } catch {
+  // 前端即時搜尋邏輯
+  const searchAirports = useCallback((q: string) => {
+    if (!q) {
       setResults([]);
+      return;
     }
+    const qLower = q.toLowerCase();
+    const filtered = AIRPORTS.filter((a) =>
+      a.keywords?.some((k) => k.toLowerCase().includes(qLower)) ||
+      a.code.toLowerCase().includes(qLower) ||
+      a.cityZh.includes(q) ||
+      a.nameZh.includes(q)
+    ).slice(0, 8);
+    setResults(filtered);
   }, []);
 
   // 輸入變更時搜尋
   useEffect(() => {
     if (query.length >= 1 && !selectedAirport) {
-      const timer = setTimeout(() => searchAirports(query), 200);
-      return () => clearTimeout(timer);
-    }
-    if (!query) {
-      searchAirports('');
+      searchAirports(query);
+    } else if (!query) {
+      setResults([]);
     }
   }, [query, searchAirports, selectedAirport]);
 
@@ -86,6 +96,15 @@ function AirportInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleSelect = (code: string, cityZh: string, nameZh?: string) => {
+    setQuery(`${cityZh} ${code}`);
+    setSelectedAirport({ code });
+    setIsOpen(false);
+    onSelect({ code, cityZh, nameZh });
+  };
+
+  const showPopular = isDestination && !query;
+
   return (
     <div className="relative flex-1 min-w-0">
       <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
@@ -102,47 +121,93 @@ function AirportInput({
             setSelectedAirport(null);
             setIsOpen(true);
           }}
-          onFocus={() => {
-            setIsOpen(true);
-            if (!query) searchAirports('');
-          }}
+          onFocus={() => setIsOpen(true)}
         />
         {selectedAirport && (
-          <Badge
-            variant="secondary"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
-          >
+          <Badge variant="secondary" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs">
             {selectedAirport.code}
           </Badge>
         )}
       </div>
 
-      {/* 搜尋結果下拉 */}
-      {isOpen && results.length > 0 && (
+      {/* 下拉選單 */}
+      {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 top-full left-0 right-0 mt-1 max-h-60 overflow-auto rounded-lg border border-border bg-popover shadow-xl"
+          className="absolute z-50 top-full left-0 right-0 mt-1 max-h-[400px] overflow-auto rounded-lg border border-border bg-popover shadow-xl"
         >
-          {results.map((airport) => (
-            <button
-              key={airport.code}
-              className="w-full px-3 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3"
-              onClick={() => {
-                setQuery(`${airport.cityZh} ${airport.code}`);
-                setSelectedAirport(airport);
-                setIsOpen(false);
-                onSelect(airport);
-              }}
-            >
-              <span className="font-mono text-sm font-semibold text-primary min-w-[3ch]">
-                {airport.code}
-              </span>
-              <span className="flex flex-col min-w-0">
-                <span className="text-sm truncate">{airport.cityZh} — {airport.nameZh}</span>
-                <span className="text-xs text-muted-foreground truncate">{airport.countryZh}</span>
-              </span>
-            </button>
-          ))}
+          {/* 輸入中：顯示搜尋結果 */}
+          {query.length > 0 && results.length > 0 && (
+            <div className="py-2">
+              {results.map((airport) => (
+                <button
+                  key={airport.code}
+                  className="w-full px-3 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  onClick={() => handleSelect(airport.code, airport.cityZh, airport.nameZh)}
+                >
+                  <span className="font-mono text-sm font-semibold text-primary min-w-[3ch]">
+                    {airport.code}
+                  </span>
+                  <span className="flex flex-col min-w-0">
+                    <span className="text-sm truncate">{airport.countryZh}・{airport.cityZh}・{airport.nameZh}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {query.length > 0 && results.length === 0 && (
+            <div className="p-4 text-sm text-center text-muted-foreground">找不到符合的機場</div>
+          )}
+
+          {/* 未輸入：顯示熱門與最近搜尋 (僅目的地) */}
+          {showPopular && (
+            <div className="p-3 space-y-4">
+              {/* 最近搜過 */}
+              {recentDestinations.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                    🕒 上次搜過
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recentDestinations.map((d) => (
+                      <button
+                        key={d.code}
+                        onClick={() => handleSelect(d.code, d.cityZh)}
+                        className="text-xs bg-accent hover:bg-accent/80 px-2.5 py-1.5 rounded-md border border-border/50 transition-colors"
+                      >
+                        {d.cityZh} <span className="font-mono text-muted-foreground ml-1">{d.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 熱門分類 */}
+              {[
+                { title: '🔥 台灣人最愛', data: HOT_PICKS },
+                { title: '🇯🇵 日本', data: POPULAR_DESTINATIONS.filter(d => d.countryZh === '日本') },
+                { title: '🇰🇷 韓國', data: POPULAR_DESTINATIONS.filter(d => d.countryZh === '韓國') },
+                { title: '🌏 東南亞', data: POPULAR_DESTINATIONS.filter(d => d.tags?.includes('東南亞')) },
+              ].map((group, idx) => (
+                <div key={idx}>
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">{group.title}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {group.data.map((d) => (
+                      <button
+                        key={d.code}
+                        onClick={() => handleSelect(d.code, d.cityZh)}
+                        className="text-left text-xs bg-background hover:bg-accent border border-border/50 px-2 py-1.5 rounded-md transition-colors flex items-center justify-between"
+                      >
+                        <span className="truncate pr-1">{d.emoji} {d.cityZh}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{d.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -162,6 +227,7 @@ export interface SearchFormProps {
     tripType: TripType;
   }) => void;
   isLoading: boolean;
+  recentDestinations?: { code: string; cityZh: string }[];
 }
 
 interface RouteInputState {
@@ -173,7 +239,7 @@ interface RouteInputState {
   cityZh: string;
 }
 
-export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+export default function SearchForm({ onSearch, isLoading, recentDestinations = [] }: SearchFormProps) {
   const [tripType, setTripType] = useState<TripType>('roundtrip');
   const [passengerCount, setPassengerCount] = useState(1);
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy');
@@ -212,7 +278,7 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   };
 
   // 更新航線的出發機場
-  const updateOrigin = (id: string, airport: Airport) => {
+  const updateOrigin = (id: string, airport: { code: string; cityZh: string; nameZh?: string }) => {
     setRoutes(
       routes.map((r) =>
         r.id === id
@@ -223,7 +289,7 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   };
 
   // 更新航線的目的地
-  const updateDestination = (id: string, airport: Airport) => {
+  const updateDestination = (id: string, airport: { code: string; cityZh: string; nameZh?: string }) => {
     setRoutes(
       routes.map((r) =>
         r.id === id
@@ -387,13 +453,13 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             <span className="text-xs text-muted-foreground font-mono mb-2 min-w-[20px]">
               {index + 1}.
             </span>
-
             {/* 出發機場 */}
             <AirportInput
               value={route.origin}
               label="出發地"
-              placeholder="輸入城市或機場代碼"
+              placeholder="城市或機場代碼 (如 TPE)"
               onSelect={(airport) => updateOrigin(route.id, airport)}
+              isDestination={false}
             />
 
             <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mb-2" />
@@ -402,8 +468,10 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             <AirportInput
               value={route.destination}
               label="目的地"
-              placeholder="輸入城市或機場代碼"
+              placeholder="城市或機場代碼 (如 NRT)"
               onSelect={(airport) => updateDestination(route.id, airport)}
+              isDestination={true}
+              recentDestinations={recentDestinations}
             />
 
             {/* 刪除按鈕（第一組不可刪除） */}

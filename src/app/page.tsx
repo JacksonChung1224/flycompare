@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import SearchForm from '@/components/SearchForm';
 import ResultsGrid from '@/components/ResultsGrid';
 import CompareBar from '@/components/CompareBar';
@@ -21,6 +21,46 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [routeStates, setRouteStates] = useState<RouteSearchState[]>([]);
   const [compareSelections, setCompareSelections] = useState<CompareSelection[]>([]);
+  
+  // 歷史紀錄狀態提升
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [history, setHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch('/api/flights/history');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.history) {
+            setHistory(data.history);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch history:', err);
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  // 從歷史紀錄中萃取最近搜過的獨特目的地 (最多 3 個)
+  const recentDestinations = useMemo(() => {
+    const dests: { code: string; cityZh: string }[] = [];
+    for (const session of history) {
+      if (session.search_routes) {
+        for (const r of session.search_routes) {
+          if (!dests.find(d => d.code === r.destination)) {
+            dests.push({ code: r.destination, cityZh: r.destination_city_zh || r.destination });
+            if (dests.length >= 3) return dests;
+          }
+        }
+      }
+    }
+    return dests;
+  }, [history]);
 
   // 搜尋處理
   const handleSearch = useCallback(
@@ -162,12 +202,20 @@ export default function Home() {
 
         {/* 搜尋表單 */}
         <section className="mb-6 md:mb-8">
-          <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+          <SearchForm 
+            onSearch={handleSearch} 
+            isLoading={isLoading} 
+            recentDestinations={recentDestinations}
+          />
         </section>
 
         {/* 歷史搜尋紀錄 (僅在無搜尋結果且剛載入時顯示) */}
         {routeStates.length === 0 && (
-          <SearchHistory onSelectHistory={handleSearch} />
+          <SearchHistory 
+            onSelectHistory={handleSearch} 
+            history={history} 
+            loading={isHistoryLoading} 
+          />
         )}
 
         {/* 搜尋結果 */}

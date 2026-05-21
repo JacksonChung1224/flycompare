@@ -84,11 +84,12 @@ export interface SearchResponse {
 export interface Airport {
   code: string;
   nameZh: string;
-  nameEn: string;
+  nameEn?: string;
   cityZh: string;
-  cityEn: string;
+  cityEn?: string;
   countryZh: string;
-  countryEn: string;
+  countryEn?: string;
+  keywords?: string[];
 }
 
 // --- 前端狀態型別 ---

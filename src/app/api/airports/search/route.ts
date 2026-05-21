@@ -20,14 +20,15 @@ export async function GET(request: NextRequest) {
     const searchFields = [
       airport.code.toLowerCase(),
       airport.nameZh,
-      airport.nameEn.toLowerCase(),
+      airport.nameEn?.toLowerCase() || '',
       airport.cityZh,
-      airport.cityEn.toLowerCase(),
+      airport.cityEn?.toLowerCase() || '',
       airport.countryZh,
-      airport.countryEn.toLowerCase(),
+      airport.countryEn?.toLowerCase() || '',
+      ...(airport.keywords || []).map(k => k.toLowerCase())
     ];
 
-    return searchFields.some((field) => field.includes(query));
+    return searchFields.some((field) => field && field.includes(query));
   });
 
   return Response.json({ airports: results.slice(0, 15) });

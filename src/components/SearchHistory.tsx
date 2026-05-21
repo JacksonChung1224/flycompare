@@ -30,32 +30,11 @@ interface SearchHistoryProps {
     cabinClass: CabinClass
     tripType: TripType
   }) => void
+  history: HistorySession[]
+  loading: boolean
 }
 
-export default function SearchHistory({ onSelectHistory }: SearchHistoryProps) {
-  const [history, setHistory] = useState<HistorySession[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch('/api/flights/history')
-        if (res.ok) {
-          const data = await res.json()
-          if (data.success && data.history) {
-            setHistory(data.history)
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch history:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchHistory()
-  }, [])
-
+export default function SearchHistory({ onSelectHistory, history, loading }: SearchHistoryProps) {
   if (loading || history.length === 0) {
     return null
   }
