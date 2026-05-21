@@ -482,7 +482,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
         {routes.map((route, index) => (
           <div
             key={route.id}
-            className={`flex flex-col lg:flex-row bg-background rounded-2xl lg:rounded-full shadow-lg border border-border/50 overflow-hidden relative ${index === 0 ? 'p-1 lg:p-1.5' : 'p-1 lg:p-1.5 lg:w-[60%]'}`}
+            className={`flex flex-col lg:flex-row bg-background rounded-2xl lg:rounded-full shadow-lg border border-border/50 relative ${index === 0 ? 'p-1 lg:p-1.5' : 'p-1 lg:p-1.5 lg:w-[60%]'}`}
           >
             {/* 航線標記 (手機版顯示) */}
             <div className="lg:hidden px-4 pt-3 pb-1 flex items-center justify-between border-b border-border/30">
