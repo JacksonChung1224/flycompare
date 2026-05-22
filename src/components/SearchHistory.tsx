@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { History, ArrowRight, PlaneTakeoff, Calendar } from 'lucide-react'
+import { History, ArrowRight, PlaneTakeoff, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { RouteInput, TripType, CabinClass, SearchRequest } from '@/lib/types'
 
@@ -30,9 +30,13 @@ interface SearchHistoryProps {
 }
 
 export default function SearchHistory({ onSelectHistory, history, loading }: SearchHistoryProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   if (loading || history.length === 0) {
     return null
   }
+
+  const displayedHistory = isExpanded ? history : history.slice(0, 3)
 
   return (
     <div className="mt-8 mb-6">
@@ -43,7 +47,7 @@ export default function SearchHistory({ onSelectHistory, history, loading }: Sea
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {history.map((session) => {
+        {displayedHistory.map((session) => {
           // 確保路徑有排序
           const routes = [...session.search_routes].sort((a, b) => a.sort_order - b.sort_order)
           
@@ -104,6 +108,23 @@ export default function SearchHistory({ onSelectHistory, history, loading }: Sea
           )
         })}
       </div>
+
+      {history.length > 3 && (
+        <div className="mt-4 flex justify-center">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-muted-foreground hover:text-indigo-600 transition-colors"
+          >
+            {isExpanded ? (
+              <>收合紀錄 <ChevronUp className="w-4 h-4 ml-1" /></>
+            ) : (
+              <>展開更多紀錄 ({history.length - 3}) <ChevronDown className="w-4 h-4 ml-1" /></>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
