@@ -368,16 +368,18 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
   };
 
   // 更新某條 route 的任意屬性
-  const updateRoute = (id: string, patch: Partial<RouteInputState>) => {
-    setRoutes(routes.map((r) => r.id === id ? { ...r, ...patch } : r));
+  const updateRoute = (id: string, patch: Partial<RouteInputState> | ((route: RouteInputState) => Partial<RouteInputState>)) => {
+    setRoutes(prev => prev.map((r) => r.id === id ? { ...r, ...(typeof patch === 'function' ? patch(r) : patch) } : r));
   };
 
   // 更新航線的出發機場
   const updateOrigin = (id: string, airport: { code: string; cityZh: string; nameZh?: string }) => {
-    updateRoute(id, {
+    updateRoute(id, (r) => ({
       origin: airport.code ? `${airport.cityZh} ${airport.code}` : '',
       originCode: airport.code,
-    });
+      // 如果選擇的出發地與目的地相同，清空目的地
+      ...(airport.code && r.destinationCode === airport.code ? { destination: '', destinationCode: '', cityZh: '' } : {}),
+    }));
   };
 
   // 更新航線的目的地
@@ -391,18 +393,24 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
 
   // 更新某條航線的出發日期
   const updateDepartureDate = (id: string, date: Date | undefined) => {
-    updateRoute(id, {
+    updateRoute(id, (r) => ({
       departureDate: date,
       departureDateOpen: false,
       // 如果回程日期早於新的出發日期，自動清除
-      ...(date && routes.find(r => r.id === id)?.returnDate && routes.find(r => r.id === id)!.returnDate! < date ? { returnDate: undefined } : {}),
-    });
+      ...(date && r.returnDate && r.returnDate < date ? { returnDate: undefined } : {}),
+    }));
     // 如果是來回且沒有回程日期，自動開啟回程日期選擇器
     if (date && tripType === 'roundtrip') {
-      const route = routes.find(r => r.id === id);
-      if (!route?.returnDate) {
-        setTimeout(() => updateRoute(id, { returnDateOpen: true }), 150);
-      }
+      // 這裡需要稍微延遲以確保狀態已經更新
+      setTimeout(() => {
+        setRoutes(prev => {
+          const route = prev.find(r => r.id === id);
+          if (route && !route.returnDate) {
+            return prev.map(r => r.id === id ? { ...r, returnDateOpen: true } : r);
+          }
+          return prev;
+        });
+      }, 150);
     }
   };
 
