@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import type { Airport, CabinClass, TripType, RouteInput } from '@/lib/types';
+import type { Airport, CabinClass, TripType, RouteInput, SearchRequest } from '@/lib/types';
 
 import { AIRPORTS } from '@/lib/airports-data';
 import { POPULAR_DESTINATIONS, HOT_PICKS } from '@/lib/popular-destinations';
@@ -310,14 +310,7 @@ function AirportInput({
 // SearchForm 主元件
 // ============================================================
 export interface SearchFormProps {
-  onSearch: (params: {
-    routes: RouteInput[];
-    departureDate: string;
-    returnDate?: string;
-    passengerCount: number;
-    cabinClass: CabinClass;
-    tripType: TripType;
-  }) => void;
+  onSearch: (params: SearchRequest) => void;
   isLoading: boolean;
   recentDestinations?: { code: string; cityZh: string }[];
 }
@@ -329,36 +322,41 @@ interface RouteInputState {
   destination: string;
   destinationCode: string;
   cityZh: string;
+  departureDate?: Date;
+  returnDate?: Date;
+  departureDateOpen: boolean;
+  returnDateOpen: boolean;
 }
 
 export default function SearchForm({ onSearch, isLoading, recentDestinations = [] }: SearchFormProps) {
   const [tripType, setTripType] = useState<TripType>('roundtrip');
   const [passengerCount, setPassengerCount] = useState(1);
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy');
-  const [departureDate, setDepartureDate] = useState<Date | undefined>();
-  const [returnDate, setReturnDate] = useState<Date | undefined>();
-  const [departureDateOpen, setDepartureDateOpen] = useState(false);
-  const [returnDateOpen, setReturnDateOpen] = useState(false);
 
-  // 動態目的地列表（預設 3 組）
+  // 動態目的地列表（預設 3 組，每條航線擁有自己的日期）
   const [routes, setRoutes] = useState<RouteInputState[]>([
-    { id: '1', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '' },
-    { id: '2', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '' },
-    { id: '3', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '' },
+    { id: '1', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '', departureDateOpen: false, returnDateOpen: false },
+    { id: '2', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '', departureDateOpen: false, returnDateOpen: false },
+    { id: '3', origin: '', originCode: '', destination: '', destinationCode: '', cityZh: '', departureDateOpen: false, returnDateOpen: false },
   ]);
 
-  // 新增航線
+  // 新增航線（繼承第一條航線的日期作為預設值）
   const addRoute = () => {
     if (routes.length >= 6) return;
+    const firstRoute = routes[0];
     setRoutes([
       ...routes,
       {
         id: Date.now().toString(),
-        origin: '',
-        originCode: '',
+        origin: firstRoute.origin,
+        originCode: firstRoute.originCode,
         destination: '',
         destinationCode: '',
         cityZh: '',
+        departureDate: firstRoute.departureDate,
+        returnDate: firstRoute.returnDate,
+        departureDateOpen: false,
+        returnDateOpen: false,
       },
     ]);
   };
@@ -369,57 +367,77 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
     setRoutes(routes.filter((r) => r.id !== id));
   };
 
+  // 更新某條 route 的任意屬性
+  const updateRoute = (id: string, patch: Partial<RouteInputState>) => {
+    setRoutes(routes.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+
   // 更新航線的出發機場
   const updateOrigin = (id: string, airport: { code: string; cityZh: string; nameZh?: string }) => {
-    setRoutes(
-      routes.map((r) =>
-        r.id === id
-          ? { ...r, origin: airport.code ? `${airport.cityZh} ${airport.code}` : '', originCode: airport.code }
-          : r
-      )
-    );
+    updateRoute(id, {
+      origin: airport.code ? `${airport.cityZh} ${airport.code}` : '',
+      originCode: airport.code,
+    });
   };
 
   // 更新航線的目的地
   const updateDestination = (id: string, airport: { code: string; cityZh: string; nameZh?: string }) => {
-    setRoutes(
-      routes.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              destination: airport.code ? `${airport.cityZh} ${airport.code}` : '',
-              destinationCode: airport.code,
-              cityZh: airport.cityZh,
-            }
-          : r
-      )
-    );
+    updateRoute(id, {
+      destination: airport.code ? `${airport.cityZh} ${airport.code}` : '',
+      destinationCode: airport.code,
+      cityZh: airport.cityZh,
+    });
+  };
+
+  // 更新某條航線的出發日期
+  const updateDepartureDate = (id: string, date: Date | undefined) => {
+    updateRoute(id, {
+      departureDate: date,
+      departureDateOpen: false,
+      // 如果回程日期早於新的出發日期，自動清除
+      ...(date && routes.find(r => r.id === id)?.returnDate && routes.find(r => r.id === id)!.returnDate! < date ? { returnDate: undefined } : {}),
+    });
+    // 如果是來回且沒有回程日期，自動開啟回程日期選擇器
+    if (date && tripType === 'roundtrip') {
+      const route = routes.find(r => r.id === id);
+      if (!route?.returnDate) {
+        setTimeout(() => updateRoute(id, { returnDateOpen: true }), 150);
+      }
+    }
+  };
+
+  // 更新某條航線的回程日期
+  const updateReturnDate = (id: string, date: Date | undefined) => {
+    updateRoute(id, { returnDate: date, returnDateOpen: false });
   };
 
   // 提交搜尋
   const handleSubmit = () => {
-    const validRoutes = routes.filter((r) => r.originCode && r.destinationCode);
+    const validRoutes = routes.filter((r) => r.originCode && r.destinationCode && r.departureDate);
     if (validRoutes.length === 0) return;
-    if (!departureDate) return;
 
     onSearch({
       routes: validRoutes.map((r) => ({
         origin: r.originCode,
         destination: r.destinationCode,
         cityZh: r.cityZh,
+        departureDate: format(r.departureDate!, 'yyyy-MM-dd'),
+        returnDate: tripType === 'roundtrip' && r.returnDate ? format(r.returnDate, 'yyyy-MM-dd') : undefined,
       })),
-      departureDate: format(departureDate, 'yyyy-MM-dd'),
-      returnDate: tripType === 'roundtrip' && returnDate ? format(returnDate, 'yyyy-MM-dd') : undefined,
       passengerCount,
       cabinClass,
       tripType,
     });
   };
 
+  // 今天開始（去掉時間部分，避免時區問題）
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const canSubmit =
-    routes.some((r) => r.originCode && r.destinationCode) &&
-    departureDate &&
-    (tripType === 'oneway' || returnDate);
+    routes.some((r) => r.originCode && r.destinationCode && r.departureDate &&
+      (tripType === 'oneway' || r.returnDate)
+    );
 
   return (
     <div className="w-full relative z-10 max-w-6xl mx-auto">
@@ -484,172 +502,127 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
           </SelectContent>
         </Select>
 
-        {/* 出發日期被移到下方主表單中 */}
       </div>
 
       <div className="space-y-3">
-        {/* 主要搜尋橫幅與額外航線 */}
+        {/* 每條航線卡片（含獨立日期） */}
         {routes.map((route, index) => (
           <div
             key={route.id}
-            className={`flex flex-col lg:flex-row bg-background rounded-2xl lg:rounded-full shadow-lg border border-border/50 relative ${index === 0 ? 'p-1 lg:p-1.5' : 'p-1 lg:p-1.5 lg:w-[60%]'}`}
+            className="bg-background rounded-2xl shadow-lg border border-border/50 relative p-1 lg:p-1.5"
           >
-            {/* 航線標記 (手機版顯示) */}
-            <div className="lg:hidden px-4 pt-3 pb-1 flex items-center justify-between border-b border-border/30">
+            {/* 航線標記 */}
+            <div className="px-4 pt-2 pb-1 flex items-center justify-between">
               <span className="text-xs font-semibold text-primary">第 {index + 1} 段航線</span>
               {index > 0 && (
-                <button onClick={() => removeRoute(route.id)} className="text-xs text-destructive flex items-center gap-1">
+                <button onClick={() => removeRoute(route.id)} className="text-xs text-destructive flex items-center gap-1 hover:underline">
                   <X className="h-3 w-3" /> 移除
                 </button>
               )}
             </div>
 
-            {/* 出發與目的地群組 */}
-            <div className="flex flex-col md:flex-row flex-1 lg:border-r border-border/50">
-              {/* 出發機場 */}
-              <div className="flex-1 border-b md:border-b-0 md:border-r border-border/50 hover:bg-muted/30 transition-colors rounded-t-xl lg:rounded-l-full lg:rounded-tr-none min-h-[60px] md:min-h-[72px] flex flex-col justify-center">
-                <AirportInput
-                  id={`origin-${route.id}`}
-                  value={route.origin}
-                  label="出發地"
-                  placeholder="從哪裡出發？"
-                  onSelect={(airport) => {
-                    updateOrigin(route.id, airport);
-                    setTimeout(() => document.getElementById(`dest-${route.id}`)?.focus(), 10);
-                  }}
-                  onClear={() => updateOrigin(route.id, { code: '', cityZh: '' })}
-                  isDestination={false}
-                  pairedAirportCode={route.destinationCode}
-                />
+            {/* 主體：出發地 → 目的地 | 出發日期 | 回程日期 */}
+            <div className="flex flex-col lg:flex-row">
+              {/* 出發與目的地群組 */}
+              <div className="flex flex-col md:flex-row flex-1 lg:border-r border-border/50 relative">
+                {/* 出發機場 */}
+                <div className="flex-1 border-b md:border-b-0 md:border-r border-border/50 hover:bg-muted/30 transition-colors rounded-t-xl lg:rounded-l-2xl lg:rounded-tr-none min-h-[60px] md:min-h-[72px] flex flex-col justify-center">
+                  <AirportInput
+                    id={`origin-${route.id}`}
+                    value={route.origin}
+                    label="出發地"
+                    placeholder="從哪裡出發？"
+                    onSelect={(airport) => {
+                      updateOrigin(route.id, airport);
+                      setTimeout(() => document.getElementById(`dest-${route.id}`)?.focus(), 10);
+                    }}
+                    onClear={() => updateOrigin(route.id, { code: '', cityZh: '' })}
+                    isDestination={false}
+                    pairedAirportCode={route.destinationCode}
+                  />
+                </div>
+
+                {/* 箭頭 */}
+                <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 w-8 h-8 bg-background border border-border rounded-full items-center justify-center shadow-sm text-primary">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+
+                {/* 目的地機場 */}
+                <div className="flex-1 hover:bg-muted/30 transition-colors min-h-[60px] md:min-h-[72px] flex flex-col justify-center">
+                  <AirportInput
+                    id={`dest-${route.id}`}
+                    value={route.destination}
+                    label="目的地"
+                    placeholder="想去哪裡？"
+                    onSelect={(airport) => {
+                      updateDestination(route.id, airport);
+                      setTimeout(() => updateRoute(route.id, { departureDateOpen: true }), 10);
+                    }}
+                    onClear={() => updateDestination(route.id, { code: '', cityZh: '' })}
+                    isDestination={true}
+                    recentDestinations={recentDestinations}
+                    pairedAirportCode={route.originCode}
+                  />
+                </div>
               </div>
 
-              {/* 轉換箭頭/圖示 (電腦版隱藏，或作為分隔) */}
-              <div className="hidden md:flex absolute left-1/2 lg:left-[25%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 w-8 h-8 bg-background border border-border rounded-full items-center justify-center shadow-sm text-primary">
-                <ArrowRight className="h-4 w-4" />
-              </div>
+              {/* 日期選擇區 (每條航線獨立) */}
+              <div className="flex flex-1 border-t lg:border-t-0 border-border/50 lg:flex-[0.7]">
+                {/* 出發日期 */}
+                <div className="flex-1 border-r border-border/50 hover:bg-muted/30 transition-colors min-h-[60px] md:min-h-[72px] flex flex-col justify-center px-4">
+                  <label className="text-xs font-semibold text-muted-foreground/80 mb-0.5">出發日期</label>
+                  <Popover open={route.departureDateOpen} onOpenChange={(open) => updateRoute(route.id, { departureDateOpen: open })}>
+                    <PopoverTrigger className="text-left w-full h-10 md:h-12 bg-transparent text-base md:text-lg font-bold text-foreground focus:outline-none flex items-center gap-2 cursor-pointer truncate">
+                      <CalendarIcon className="h-5 w-5 text-primary/60 shrink-0" />
+                      <span className="truncate">
+                        {route.departureDate ? format(route.departureDate, 'MM/dd (EEE)', { locale: zhTW }) : '選擇日期'}
+                      </span>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={route.departureDate}
+                        onSelect={(d) => updateDepartureDate(route.id, d ?? undefined)}
+                        disabled={(date) => date < today}
+                        locale={zhTW}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-              {/* 目的地機場 */}
-              <div className="flex-1 hover:bg-muted/30 transition-colors md:rounded-r-xl lg:rounded-none min-h-[60px] md:min-h-[72px] flex flex-col justify-center">
-                <AirportInput
-                  id={`dest-${route.id}`}
-                  value={route.destination}
-                  label="目的地"
-                  placeholder="想去哪裡？"
-                  onSelect={(airport) => {
-                    updateDestination(route.id, airport);
-                    if (index === 0) setTimeout(() => setDepartureDateOpen(true), 10);
-                  }}
-                  onClear={() => updateDestination(route.id, { code: '', cityZh: '' })}
-                  isDestination={true}
-                  recentDestinations={recentDestinations}
-                  pairedAirportCode={route.originCode}
-                />
+                {/* 回程日期 */}
+                <div className={`flex-1 hover:bg-muted/30 transition-colors min-h-[60px] md:min-h-[72px] flex flex-col justify-center px-4 lg:rounded-r-2xl ${tripType === 'oneway' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <label className="text-xs font-semibold text-muted-foreground/80 mb-0.5">回程日期</label>
+                  <Popover open={route.returnDateOpen} onOpenChange={(open) => updateRoute(route.id, { returnDateOpen: open })}>
+                    <PopoverTrigger className="text-left w-full h-10 md:h-12 bg-transparent text-base md:text-lg font-bold text-foreground focus:outline-none flex items-center gap-2 cursor-pointer truncate">
+                      <CalendarIcon className="h-5 w-5 text-primary/60 shrink-0" />
+                      <span className="truncate">
+                        {tripType === 'oneway' ? '單程' : route.returnDate ? format(route.returnDate, 'MM/dd (EEE)', { locale: zhTW }) : '選擇日期'}
+                      </span>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={route.returnDate}
+                        onSelect={(d) => updateReturnDate(route.id, d ?? undefined)}
+                        disabled={(date) => {
+                          if (date < today) return true;
+                          if (route.departureDate && date <= route.departureDate) return true;
+                          return false;
+                        }}
+                        locale={zhTW}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
-
-            {/* 第一組航線才顯示的日期選擇與搜尋按鈕 */}
-            {index === 0 && (
-              <div className="flex flex-col md:flex-row flex-1 lg:flex-[0.8]">
-                {/* 日期選擇區 */}
-                <div className="flex flex-1 border-t lg:border-t-0 border-b md:border-b-0 border-border/50">
-                  {/* 出發日期 */}
-                  <div className="flex-1 border-r border-border/50 hover:bg-muted/30 transition-colors min-h-[60px] md:min-h-[72px] flex flex-col justify-center px-4">
-                    <label className="text-xs font-semibold text-muted-foreground/80 mb-0.5">出發日期</label>
-                    <Popover open={departureDateOpen} onOpenChange={setDepartureDateOpen}>
-                      <PopoverTrigger className="text-left w-full h-10 md:h-12 bg-transparent text-base md:text-lg font-bold text-foreground focus:outline-none flex items-center gap-2 cursor-pointer truncate">
-                        <CalendarIcon className="h-5 w-5 text-primary/60 shrink-0" />
-                        <span className="truncate">
-                          {departureDate ? format(departureDate, 'MM/dd (EEE)', { locale: zhTW }) : '選擇日期'}
-                        </span>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={departureDate}
-                          onSelect={(d) => {
-                            setDepartureDate(d ?? undefined);
-                            setDepartureDateOpen(false);
-                            if (tripType === 'roundtrip' && !returnDate) {
-                              setTimeout(() => setReturnDateOpen(true), 150);
-                            }
-                          }}
-                          disabled={(date) => date < new Date()}
-                          locale={zhTW}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* 回程日期 */}
-                  <div className={`flex-1 hover:bg-muted/30 transition-colors min-h-[60px] md:min-h-[72px] flex flex-col justify-center px-4 ${tripType === 'oneway' ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <label className="text-xs font-semibold text-muted-foreground/80 mb-0.5">回程日期</label>
-                    <Popover open={returnDateOpen} onOpenChange={setReturnDateOpen}>
-                      <PopoverTrigger className="text-left w-full h-10 md:h-12 bg-transparent text-base md:text-lg font-bold text-foreground focus:outline-none flex items-center gap-2 cursor-pointer truncate">
-                        <CalendarIcon className="h-5 w-5 text-primary/60 shrink-0" />
-                        <span className="truncate">
-                          {tripType === 'oneway' ? '單程' : returnDate ? format(returnDate, 'MM/dd (EEE)', { locale: zhTW }) : '選擇日期'}
-                        </span>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={returnDate}
-                          onSelect={(d) => {
-                            setReturnDate(d ?? undefined);
-                            setReturnDateOpen(false);
-                          }}
-                          disabled={(date) => date < new Date() || (departureDate ? date < departureDate : false)}
-                          locale={zhTW}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* 搜尋按鈕 */}
-                <div className="p-2 md:p-0 md:pl-2 flex items-center justify-center lg:pr-1">
-                  <Button
-                    size="lg"
-                    className="w-full md:w-auto h-14 md:h-[calc(100%-8px)] lg:h-[64px] px-8 md:px-10 rounded-xl lg:rounded-full text-base lg:text-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98]"
-                    disabled={!canSubmit || isLoading}
-                    onClick={handleSubmit}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 animate-spin" />
-                        搜尋中...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-5 w-5 lg:h-6 lg:w-6 lg:mr-2" />
-                        <span className="lg:inline">搜尋</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {/* 第二組以後的刪除按鈕 (電腦版) */}
-            {index > 0 && (
-              <div className="hidden lg:flex items-center justify-center pr-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => removeRoute(route.id)}
-                  title="移除此航線"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            )}
           </div>
         ))}
       </div>
 
-      {/* 底部操作列 (新增目的地) */}
-      <div className="mt-4 flex items-center justify-start px-2">
+      {/* 底部操作列 */}
+      <div className="mt-4 flex items-center justify-between px-2">
         <Button
           variant="ghost"
           size="sm"
@@ -660,6 +633,26 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
           <Plus className="h-4 w-4 mr-1.5 border-2 border-primary rounded-full p-0.5" />
           新增其他想比較的目的地
           <span className="ml-2 text-primary/60 text-xs">({routes.length}/6)</span>
+        </Button>
+
+        {/* 搜尋按鈕 (移到底部) */}
+        <Button
+          size="lg"
+          className="px-8 md:px-10 h-12 md:h-14 rounded-full text-base md:text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98]"
+          disabled={!canSubmit || isLoading}
+          onClick={handleSubmit}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              搜尋中...
+            </>
+          ) : (
+            <>
+              <Search className="h-5 w-5 mr-2" />
+              搜尋全部航線
+            </>
+          )}
         </Button>
       </div>
     </div>

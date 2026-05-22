@@ -22,16 +22,34 @@ import type { FlightResult } from '@/lib/types';
 
 /**
  * 格式化時間 HH:MM
- * Duffel API 回傳的 departing_at / arriving_at 是「當地機場時間」，
- * 格式為 ISO 8601 不含時區（例如 "2026-05-30T21:00:00"）。
- * 直接從字串提取 HH:MM，避免 Date 物件做時區轉換。
+ * 支援多種格式：
+ *  - ISO 不含時區: "2026-05-30T21:00:00"
+ *  - ISO 含時區:   "2026-05-30T21:00:00+09:00"
+ *  - Supabase timestamptz: "2026-05-30 21:00:00+00"
+ *  - 純日期 (已損壞): "2026-05-30" → 回傳 '--:--'
  */
-function formatTime(isoString: string): string {
-  if (!isoString) return '--:--';
-  // 直接從 ISO 字串提取 "HH:MM"（位置固定在 T 後面）
-  const tIndex = isoString.indexOf('T');
-  if (tIndex === -1) return '--:--';
-  return isoString.substring(tIndex + 1, tIndex + 6); // "HH:MM"
+function formatTime(timeStr: string): string {
+  if (!timeStr) return '--:--';
+
+  // 方法 1: 嘗試找 'T' 分隔符 (標準 ISO)
+  const tIndex = timeStr.indexOf('T');
+  if (tIndex !== -1 && timeStr.length >= tIndex + 6) {
+    return timeStr.substring(tIndex + 1, tIndex + 6); // "HH:MM"
+  }
+
+  // 方法 2: 嘗試找空格分隔符 (Supabase 格式 "2026-05-30 21:00:00+00")
+  const spaceIndex = timeStr.indexOf(' ');
+  if (spaceIndex !== -1 && timeStr.length >= spaceIndex + 6) {
+    const timePart = timeStr.substring(spaceIndex + 1, spaceIndex + 6);
+    if (/^\d{2}:\d{2}$/.test(timePart)) return timePart;
+  }
+
+  // 方法 3: 如果字串本身就是 "HH:MM" 格式
+  if (/^\d{2}:\d{2}/.test(timeStr)) {
+    return timeStr.substring(0, 5);
+  }
+
+  return '--:--';
 }
 
 /**

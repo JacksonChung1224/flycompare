@@ -15,6 +15,7 @@ import type {
   RouteSearchState,
   CompareSelection,
   FlightResult,
+  SearchRequest,
 } from '@/lib/types';
 
 export default function Home() {
@@ -64,14 +65,7 @@ export default function Home() {
 
   // 搜尋處理
   const handleSearch = useCallback(
-    async (params: {
-      routes: RouteInput[];
-      departureDate: string;
-      returnDate?: string;
-      passengerCount: number;
-      cabinClass: CabinClass;
-      tripType: TripType;
-    }) => {
+    async (params: SearchRequest) => {
       setIsLoading(true);
       setCompareSelections([]);
 

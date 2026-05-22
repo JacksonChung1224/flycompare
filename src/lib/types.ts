@@ -20,6 +20,8 @@ export interface SearchRoute {
   origin: string;
   destination: string;
   destination_city_zh: string;
+  departure_date?: string;
+  return_date?: string;
   sort_order: number;
 }
 
@@ -55,12 +57,14 @@ export interface RouteInput {
   origin: string;
   destination: string;
   cityZh: string;
+  departureDate: string;
+  returnDate?: string;
 }
 
 export interface SearchRequest {
   routes: RouteInput[];
-  departureDate: string;
-  returnDate?: string;
+  departureDate?: string;   // 保留作為向下相容 (舊的歷史紀錄)
+  returnDate?: string;      // 保留作為向下相容
   passengerCount: number;
   cabinClass: CabinClass;
   tripType: TripType;

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { History, ArrowRight, PlaneTakeoff, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { RouteInput, TripType, CabinClass } from '@/lib/types'
+import type { RouteInput, TripType, CabinClass, SearchRequest } from '@/lib/types'
 
 interface HistorySession {
   id: string
@@ -17,19 +17,14 @@ interface HistorySession {
     origin: string
     destination: string
     destination_city_zh: string
+    departure_date?: string
+    return_date?: string
     sort_order: number
   }[]
 }
 
 interface SearchHistoryProps {
-  onSelectHistory: (params: {
-    routes: RouteInput[]
-    departureDate: string
-    returnDate?: string
-    passengerCount: number
-    cabinClass: CabinClass
-    tripType: TripType
-  }) => void
+  onSelectHistory: (params: SearchRequest) => void
   history: HistorySession[]
   loading: boolean
 }
@@ -56,9 +51,13 @@ export default function SearchHistory({ onSelectHistory, history, loading }: Sea
             <div 
               key={session.id}
               onClick={() => onSelectHistory({
-                routes: routes.map(r => ({ origin: r.origin, destination: r.destination, cityZh: r.destination_city_zh || r.destination })),
-                departureDate: session.departure_date,
-                returnDate: session.return_date || undefined,
+                routes: routes.map(r => ({ 
+                  origin: r.origin, 
+                  destination: r.destination, 
+                  cityZh: r.destination_city_zh || r.destination,
+                  departureDate: r.departure_date || session.departure_date,
+                  returnDate: r.return_date || session.return_date || undefined
+                })),
                 passengerCount: session.passenger_count,
                 cabinClass: session.cabin_class,
                 tripType: session.trip_type

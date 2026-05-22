@@ -23,8 +23,6 @@ export function getDuffel(): Duffel {
 // ============================================================
 export function buildSlices(
   route: RouteInput,
-  departureDate: string,
-  returnDate: string | undefined,
   tripType: TripType
 ) {
   const slices: Array<{
@@ -37,17 +35,17 @@ export function buildSlices(
     {
       origin: route.origin,
       destination: route.destination,
-      departure_date: departureDate,
+      departure_date: route.departureDate,
       arrival_time: null,
       departure_time: null,
     },
   ];
 
-  if (tripType === 'roundtrip' && returnDate) {
+  if (tripType === 'roundtrip' && route.returnDate) {
     slices.push({
       origin: route.destination,
       destination: route.origin,
-      departure_date: returnDate,
+      departure_date: route.returnDate,
       arrival_time: null,
       departure_time: null,
     });

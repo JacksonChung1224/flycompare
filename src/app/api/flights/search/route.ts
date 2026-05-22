@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!body.departureDate) {
+    if (body.routes.some((r) => !r.departureDate)) {
       return Response.json(
-        { success: false, error: '請選擇出發日期' },
+        { success: false, error: '所有航線都必須選擇出發日期' },
         { status: 400 }
       );
     }
-    if (body.tripType === 'roundtrip' && !body.returnDate) {
+    if (body.tripType === 'roundtrip' && body.routes.some((r) => !r.returnDate)) {
       return Response.json(
-        { success: false, error: '來回行程需要選擇回程日期' },
+        { success: false, error: '來回行程的航線必須選擇回程日期' },
         { status: 400 }
       );
     }
@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
         passenger_count: body.passengerCount,
         trip_type: body.tripType,
         cabin_class: body.cabinClass,
-        departure_date: body.departureDate,
-        return_date: body.returnDate || null,
+        departure_date: body.routes[0].departureDate,
+        return_date: body.routes[0].returnDate || null,
       })
       .select()
       .single();
@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
       origin: route.origin,
       destination: route.destination,
       destination_city_zh: route.cityZh,
+      departure_date: route.departureDate,
+      return_date: route.returnDate || null,
       sort_order: index,
     }));
 
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
 
       // Duffel Promise
       const duffelPromise = duffelClient.offerRequests.create({
-        slices: buildSlices(routeInput, body.departureDate, body.returnDate, body.tripType),
+        slices: buildSlices(routeInput, body.tripType),
         passengers: buildPassengers(body.passengerCount),
         cabin_class: body.cabinClass,
         return_offers: true,
@@ -119,8 +121,8 @@ export async function POST(request: NextRequest) {
       const serpapiPromise = searchFlightsViaSerpApi({
         origin: routeInput.origin,
         destination: routeInput.destination,
-        departureDate: body.departureDate,
-        returnDate: body.returnDate,
+        departureDate: routeInput.departureDate,
+        returnDate: routeInput.returnDate,
         tripType: body.tripType,
         cabinClass: body.cabinClass,
         passengers: body.passengerCount,
