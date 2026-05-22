@@ -20,19 +20,24 @@ function mapTravelClass(cabinClass: CabinClass): number {
   }
 }
 
-/**
- * 解析 SerpApi 時間格式 "6:35 PM" → { hours: 18, minutes: 35 }
- */
 function parseTimeString(timeStr: string): { hours: number; minutes: number } {
-  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!match) return { hours: 0, minutes: 0 };
+  // 支援格式: "6:35 PM", "18:35", "下午6:35", "上午 6:35"
+  const match = timeStr.match(/(?:(上午|下午)\s*)?(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i);
+  if (!match) {
+    console.warn(`Unrecognized time format from SerpApi: ${timeStr}`);
+    return { hours: 0, minutes: 0 };
+  }
 
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
+  const zhPeriod = match[1]; // 上午 or 下午
+  let hours = parseInt(match[2], 10);
+  const minutes = parseInt(match[3], 10);
+  const enPeriod = match[4]?.toUpperCase();
 
-  if (period === 'PM' && hours !== 12) hours += 12;
-  if (period === 'AM' && hours === 12) hours = 0;
+  const isPM = enPeriod === 'PM' || zhPeriod === '下午';
+  const isAM = enPeriod === 'AM' || zhPeriod === '上午';
+
+  if (isPM && hours !== 12) hours += 12;
+  if (isAM && hours === 12) hours = 0;
 
   return { hours, minutes };
 }
