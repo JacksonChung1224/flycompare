@@ -7,6 +7,7 @@ import CompareBar from '@/components/CompareBar';
 import ThemeToggle from '@/components/ThemeToggle';
 import AuthButton from '@/components/AuthButton';
 import SearchHistory from '@/components/SearchHistory';
+import { FavoritesSheet } from '@/components/FavoritesSheet';
 import { Plane } from 'lucide-react';
 import type {
   CabinClass,
@@ -170,6 +171,7 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <FavoritesSheet />
             <AuthButton />
             <ThemeToggle />
           </div>
