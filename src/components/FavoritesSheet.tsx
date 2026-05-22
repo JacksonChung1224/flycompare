@@ -13,6 +13,7 @@ import { Star, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FlightResult } from '@/lib/types';
 import { formatTime, formatPrice, getAirlineLogoUrl } from '@/components/FlightCard';
+import { FlightDetailsModal } from '@/components/FlightDetailsModal';
 
 interface FavoriteRecord {
   id: string;
@@ -25,6 +26,8 @@ export function FavoritesSheet() {
   const [open, setOpen] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const fetchFavorites = async () => {
     setLoading(true);
@@ -87,9 +90,19 @@ export function FavoritesSheet() {
             {favorites.map((fav) => {
               const f = fav.flight_data;
               return (
-                <div key={fav.flight_id} className="p-4 border rounded-xl bg-card relative group">
+                <div 
+                  key={fav.flight_id} 
+                  className="p-4 border rounded-xl bg-card relative group cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => {
+                    setSelectedFlight(f);
+                    setModalOpen(true);
+                  }}
+                >
                   <button 
-                    onClick={() => removeFavorite(fav.flight_id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFavorite(fav.flight_id);
+                    }}
                     className="absolute top-3 right-3 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -120,6 +133,15 @@ export function FavoritesSheet() {
           </div>
         )}
       </SheetContent>
+
+      {/* 航班詳情彈窗 */}
+      {selectedFlight && (
+        <FlightDetailsModal 
+          flight={selectedFlight} 
+          open={modalOpen} 
+          onOpenChange={setModalOpen} 
+        />
+      )}
     </Sheet>
   );
 }
