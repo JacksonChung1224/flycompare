@@ -63,8 +63,9 @@ export function FavoritesSheet() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="outline" size="icon" className="relative group overflow-hidden" />}>
-        <Star className="w-4 h-4 text-amber-500 fill-amber-500/20 group-hover:fill-amber-500 transition-colors" />
+      <SheetTrigger render={<Button variant="outline" className="relative group overflow-hidden px-4 py-2 h-auto gap-2" />}>
+        <Star className="w-5 h-5 text-amber-500 fill-amber-500/20 group-hover:fill-amber-500 transition-colors" />
+        <span className="font-medium text-base">我的收藏</span>
       </SheetTrigger>
       <SheetContent side="left" className="w-[400px] sm:w-[540px] overflow-y-auto">
         <SheetHeader className="mb-6">
