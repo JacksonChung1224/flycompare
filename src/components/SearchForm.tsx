@@ -630,11 +630,11 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
       </div>
 
       {/* 底部操作列 */}
-      <div className="mt-4 flex items-center justify-between px-2">
+      <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between px-2 gap-6 md:gap-0">
         <Button
           variant="ghost"
           size="sm"
-          className="text-sm font-semibold text-primary hover:text-primary hover:bg-primary/10 rounded-full px-4"
+          className="text-sm font-semibold text-primary hover:text-primary hover:bg-primary/10 rounded-full px-4 self-start md:self-auto"
           onClick={addRoute}
           disabled={routes.length >= 6}
         >
@@ -646,7 +646,7 @@ export default function SearchForm({ onSearch, isLoading, recentDestinations = [
         {/* 搜尋按鈕 (移到底部) */}
         <Button
           size="lg"
-          className="px-8 md:px-10 h-12 md:h-14 rounded-full text-base md:text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98]"
+          className="w-full md:w-auto px-8 md:px-10 h-12 md:h-14 rounded-full text-base md:text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98]"
           disabled={!canSubmit || isLoading}
           onClick={handleSubmit}
         >
