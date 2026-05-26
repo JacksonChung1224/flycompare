@@ -25,6 +25,16 @@ export interface SearchRoute {
   sort_order: number;
 }
 
+export interface FlightSegmentData {
+  airline_code: string;
+  airline_name_zh: string;
+  flight_number: string;
+  departure_time: string;
+  arrival_time: string;
+  flight_duration_minutes: number;
+  stops: number;
+}
+
 export interface FlightResult {
   id: string;
   route_id: string;
@@ -43,6 +53,7 @@ export interface FlightResult {
   carry_on_pieces: number | null;
   carbon_emissions_kg: number | null;
   stops: number;
+  return_flight?: FlightSegmentData;
   duffel_offer_id: string;
   fetched_at: string;
   source: 'duffel' | 'serpapi';

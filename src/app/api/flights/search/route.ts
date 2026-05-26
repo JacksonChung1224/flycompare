@@ -170,6 +170,29 @@ export async function POST(request: NextRequest) {
 
           const stops = segments.length - 1;
 
+          let return_flight: any = undefined;
+          if (offer.slices.length > 1) {
+            const retSlice = offer.slices[1];
+            const retSegments = retSlice.segments || [];
+            if (retSegments.length > 0) {
+              const firstRetSegment = retSegments[0];
+              const lastRetSegment = retSegments[retSegments.length - 1];
+              const retCarrier = firstRetSegment?.operating_carrier || firstRetSegment?.marketing_carrier;
+              const retAirlineCode = retCarrier?.iata_code || 'ZZ';
+              const retFlightNumber = `${firstRetSegment?.marketing_carrier?.iata_code || retAirlineCode}${firstRetSegment?.marketing_carrier_flight_number || ''}`.replace(/\s+/g, '');
+              
+              return_flight = {
+                airline_code: retAirlineCode,
+                airline_name_zh: getAirlineNameZh(retAirlineCode),
+                flight_number: retFlightNumber,
+                departure_time: firstRetSegment?.departing_at || '',
+                arrival_time: lastRetSegment?.arriving_at || '',
+                flight_duration_minutes: parseDurationToMinutes(retSlice?.duration || null),
+                stops: retSegments.length - 1
+              };
+            }
+          }
+
           return {
             id: '',
             route_id: route.id,
@@ -188,6 +211,7 @@ export async function POST(request: NextRequest) {
             carry_on_pieces: carryOnBaggage?.quantity ?? null,
             carbon_emissions_kg: carbonEmissions,
             stops,
+            return_flight,
             duffel_offer_id: offer.id,
             fetched_at: new Date().toISOString(),
             source: 'duffel' as const,

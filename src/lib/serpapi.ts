@@ -205,13 +205,45 @@ export async function searchFlightsViaSerpApi(params: {
     }
 
     // 合併 best_flights + other_flights
-    const allFlights: SerpApiFlightGroup[] = [
+    let allFlights: SerpApiFlightGroup[] = [
       ...(data.best_flights || []),
       ...(data.other_flights || []),
     ];
 
     if (allFlights.length === 0) {
       return [];
+    }
+
+    // 若為來回票，抓取前 3 筆最佳選項的回程
+    if (params.tripType === 'roundtrip' && params.returnDate) {
+      const topFlights = allFlights.slice(0, 3);
+      await Promise.all(
+        topFlights.map(async (fg, index) => {
+          if (!fg.departure_token) return;
+          try {
+            const retParams = new URLSearchParams({
+              engine: 'google_flights',
+              departure_token: fg.departure_token,
+              api_key: apiKey,
+              currency: 'TWD',
+              hl: 'zh-TW',
+            });
+            const retRes = await fetch(`${SERPAPI_BASE_URL}?${retParams.toString()}`, { signal: AbortSignal.timeout(10000) });
+            if (retRes.ok) {
+              const retData: SerpApiResponse = await retRes.json();
+              const bestReturn = retData.best_flights?.[0] || retData.other_flights?.[0];
+              if (bestReturn && bestReturn.flights) {
+                // 將回程航班資料附加到 extensions 中暫存
+                fg.extensions = [JSON.stringify(bestReturn)];
+              }
+            }
+          } catch (e) {
+            console.error('Failed to fetch return flight for SerpApi', e);
+          }
+        })
+      );
+      // 只保留有去回程的航班，避免混淆
+      allFlights = topFlights;
     }
 
     // 轉換為 FlightResult 格式
@@ -251,6 +283,38 @@ export async function searchFlightsViaSerpApi(params: {
         // 停靠次數
         const stops = fg.flights.length - 1;
 
+        // 處理回程航班 (從 extensions 讀回)
+        let return_flight: any = undefined;
+        if (params.tripType === 'roundtrip' && fg.extensions && fg.extensions.length > 0) {
+          try {
+            const retGroup = JSON.parse(fg.extensions[0]);
+            if (retGroup.flights && retGroup.flights.length > 0) {
+              const firstRet = retGroup.flights[0];
+              const lastRet = retGroup.flights[retGroup.flights.length - 1];
+              const retCode = extractAirlineCode(firstRet.flight_number);
+              const retNum = firstRet.flight_number.replace(/\s+/g, '');
+              const retDepStr = firstRet.departure_airport.time;
+              const retArrStr = lastRet.arrival_airport.time;
+              
+              const retArrOffset = calculateArrivalDayOffset(retDepStr, retGroup.total_duration);
+              const retDepISO = buildISOTime(params.returnDate || '', retDepStr, 0);
+              const retArrISO = buildISOTime(params.returnDate || '', retArrStr, retArrOffset);
+              
+              return_flight = {
+                airline_code: retCode,
+                airline_name_zh: getAirlineNameZh(retCode),
+                flight_number: retNum,
+                departure_time: retDepISO,
+                arrival_time: retArrISO,
+                flight_duration_minutes: retGroup.total_duration,
+                stops: retGroup.flights.length - 1
+              };
+            }
+          } catch(e) {
+            console.error('Parse return flight error', e);
+          }
+        }
+
         return {
           id: '',
           route_id: params.routeId,
@@ -269,6 +333,7 @@ export async function searchFlightsViaSerpApi(params: {
           carry_on_pieces: null,
           carbon_emissions_kg: carbonKg,
           stops,
+          return_flight,
           duffel_offer_id: `serpapi_${flightNumber}_${params.departureDate}`,
           fetched_at: new Date().toISOString(),
           source: 'serpapi' as const,
