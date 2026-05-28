@@ -223,6 +223,11 @@ export async function searchFlightsViaSerpApi(params: {
           try {
             const retParams = new URLSearchParams({
               engine: 'google_flights',
+              departure_id: params.origin,
+              arrival_id: params.destination,
+              outbound_date: params.departureDate,
+              return_date: params.returnDate || '',
+              type: '1',
               departure_token: fg.departure_token,
               api_key: apiKey,
               currency: 'TWD',
