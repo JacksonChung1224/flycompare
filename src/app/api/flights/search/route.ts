@@ -270,9 +270,8 @@ export async function POST(request: NextRequest) {
           carry_on_pieces: f.carry_on_pieces,
           carbon_emissions_kg: f.carbon_emissions_kg,
           stops: f.stops,
-          duffel_offer_id: f.return_flight 
-            ? `${f.duffel_offer_id}|||${JSON.stringify(f.return_flight)}` 
-            : f.duffel_offer_id,
+          return_flight: f.return_flight,
+          duffel_offer_id: f.duffel_offer_id,
           source: f.source,
         }));
 
@@ -285,19 +284,9 @@ export async function POST(request: NextRequest) {
           console.error('Failed to insert flight results:', insertError);
         }
 
-        const rawReturnFlights = inserted ? (inserted as FlightResult[]) : sortedUniqueFlights;
-        const returnFlights = rawReturnFlights.map(f => {
-          if (f.duffel_offer_id && f.duffel_offer_id.includes('|||')) {
-             const parts = f.duffel_offer_id.split('|||');
-             f.duffel_offer_id = parts[0];
-             try { f.return_flight = JSON.parse(parts[1]); } catch(e){}
-          }
-          return f;
-        });
-
         return {
           route,
-          flights: returnFlights,
+          flights: inserted ? (inserted as FlightResult[]) : sortedUniqueFlights,
         };
       } else {
         return {

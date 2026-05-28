@@ -64,18 +64,9 @@ export async function GET(request: NextRequest) {
           error: '取得航班結果失敗',
         });
       } else if (flights && flights.length > 0) {
-        const parsedFlights = flights.map(f => {
-          if (f.duffel_offer_id && f.duffel_offer_id.includes('|||')) {
-             const parts = f.duffel_offer_id.split('|||');
-             f.duffel_offer_id = parts[0];
-             try { f.return_flight = JSON.parse(parts[1]); } catch(e){}
-          }
-          return f;
-        });
-
         results.push({
           route,
-          flights: parsedFlights as FlightResult[],
+          flights: flights as FlightResult[],
         });
       } else {
         results.push({
